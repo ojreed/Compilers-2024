@@ -138,7 +138,46 @@ Node *Lexer::read_token() {
       return token_create(TOK_RPAREN, lexeme, line, col);
     case ';':
       return token_create(TOK_SEMICOLON, lexeme, line, col);
-    // TODO: add cases for other kinds of tokens
+    //added cases for other kinds of tokens
+    case 'v': //var token
+      if (is_var() == 1){
+          return token_create(TOK_VAR, lexeme, line, col);
+      } else{
+         SyntaxError::raise(get_current_loc(), "Unexpected character '%c'", read());
+      }
+    case '=': //asignment or equivlance
+      if (choose_next('=','=') == 0){
+        return token_create(TOK_ASSIGN, lexeme, line, col);
+      }
+      return token_create(TOK_LE, lexeme, line, col);
+    case '&': //Logical and
+      if (choose_next('&','&') == 1){
+          return token_create(TOK_LAND, lexeme, line, col);
+      } else{
+          SyntaxError::raise(get_current_loc(), "Unexpected character '%c'", read());
+      }
+    case '|': //Logical or
+      if (choose_next('|','|') == 1){
+          return token_create(TOK_LOR, lexeme, line, col);
+      } else{
+          SyntaxError::raise(get_current_loc(), "Unexpected character '%c'", read());
+      }
+    case '<'://Less than (or equal to)
+      if (choose_next('<','=') == 0){
+        return token_create(TOK_LL, lexeme, line, col); 
+      }
+      return token_create(TOK_LLE, lexeme, line, col);
+    case '>'://Greater than (or equal to)
+      if (choose_next('>','=') == 0){
+          return token_create(TOK_LG, lexeme, line, col);
+      }
+      return token_create(TOK_LGE, lexeme, line, col);
+    case '!'://Logical Not Equals
+      if (choose_next('!','=') == 1){
+          return token_create(TOK_LNE, lexeme, line, col);
+      } else{
+          SyntaxError::raise(get_current_loc(), "Unexpected character '%c'", read());
+      }
     default:
       SyntaxError::raise(get_current_loc(), "Unrecognized character '%c'", c);
     }
@@ -173,3 +212,26 @@ Node *Lexer::read_continued_token(enum TokenKind kind, const std::string &lexeme
 }
 
 // TODO: implement additional member functions if necessary
+int *Lexer::choose_next(int c, int t){
+    int n = read();
+    if (n == t){//next char is target 
+        return 1;
+    } else {//next char is other
+        unread(n);
+        return 0;
+    }
+}
+
+int *Lexer::is_var(){
+    int a = read();
+    int r = read();
+    if (a == 'r' && r =='r'){//next chars are targets 
+        return 1;
+    } else {//next char is other
+        unread(r);
+        unread(a)
+        return 0;
+    }
+}
+
+

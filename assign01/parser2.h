@@ -19,6 +19,7 @@ private:
   // Parse functions for nonterminal grammar symbols
   Node *parse_Unit();
   Node *parse_Stmt();
+  Node *parse_A();
   Node *parse_E();
   Node *parse_EPrime(Node *ast);
   Node *parse_T();

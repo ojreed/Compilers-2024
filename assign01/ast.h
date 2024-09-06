@@ -14,6 +14,16 @@ enum ASTKind {
   AST_UNIT,
   AST_STATEMENT,
   // TODO: add members for other AST node kinds
+  AST_VAR,
+  AST_ASSIGN,
+  AST_LOR,
+  AST_LAND,
+  AST_LL,
+  AST_LLE,
+  AST_LG,
+  AST_LGE,
+  AST_LE,
+  AST_LNE
 };
 
 class ASTTreePrint : public TreePrint {

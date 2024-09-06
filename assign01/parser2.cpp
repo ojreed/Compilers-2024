@@ -17,7 +17,8 @@
 //
 // Unit -> Stmt
 // Unit -> Stmt Unit
-// Stmt -> E ;
+// Stmt -> A ;
+// Stmt → var ident ;
 // E -> T E'
 // E' -> + T E'
 // E' -> - T E'
@@ -29,6 +30,18 @@
 // F -> number
 // F -> ident
 // F -> ( E )
+// A    → ident = A
+// A    → L
+// L    → R || R
+// L    → R && R
+// L    → R
+// R    → E < E
+// R    → E <= E
+// R    → E > E
+// R    → E >= E
+// R    → E == E
+// R    → E != E
+// R    → E
 
 Parser2::Parser2(Lexer *lexer_to_adopt)
   : m_lexer(lexer_to_adopt)
@@ -57,7 +70,8 @@ Node *Parser2::parse_Unit() {
 }
 
 Node *Parser2::parse_Stmt() {
-  // Stmt -> ^ E ;
+  // Stmt -> ^ A ;
+  // Stmt -> ^ var ident ;
 
   std::unique_ptr<Node> s(new Node(AST_STATEMENT));
 
@@ -66,11 +80,113 @@ Node *Parser2::parse_Stmt() {
     SyntaxError::raise(m_lexer->get_current_loc(), "Unexpected end of input looking for statement");
   }
 
-  s->append_kid(parse_E());
+  int next_tok_tag = next_tok->get_tag();
+  if (next_tok_tag == TOK_VAR) {
+      //add VAR and IDENT
+      std::unique_ptr<Node> var(expect(static_cast<enum TokenKind>(next_tag)));
+      var->append_kid(expect(TOK_IDENTIFIER));
+      s->append_kid(var);
+  } else {
+      //Add Parse A
+      s->append_kid(parse_A());
+  }
+  //Always look for semicolon
   expect_and_discard(TOK_SEMICOLON);
 
   return s.release();
 }
+
+Node *Parser2::parse_A() {
+    //TODO: implement
+    //A    → ident = A
+    //A    → L
+
+    Node *next_tok = m_lexer->peek(1);
+    Node *next_next_tok = m_lexer->peek(2);
+
+    int next_tok_tag = next_tok->get_tag();
+    int next_next_tok_tag = next_next_tok->get_tag();
+    
+    if (next_tok == nullptr || next_next_tok == nullptr) {
+        SyntaxError::raise(m_lexer->get_current_loc(), "Unexpected end of input looking for statement");
+    }
+
+    if (next_tok_tag == TOK_IDENTIFIER && next_next_tok_tag == TOK_ASSIGN) {
+        //Assign <- ID and A
+         std::unique_ptr<Node> ID(expect(static_cast<enum TokenKind>(next_tag)));
+         std::unique_ptr<Node> assign(expect(static_cast<enum TokenKind>(next_tag)));
+         assign->append_kid(ID);
+         assign->append_kid(parse_A());
+         return assign.release();
+    } else {
+        return parse_L();
+    }
+}
+
+
+Node *Parser2::parse_L() {
+    Node *ast = parse_R();
+    
+    Node *next_tok = m_lexer->peek();
+    if (next_tok == nullptr) {
+        SyntaxError::raise(m_lexer->get_current_loc(), "Unexpected end of input looking for statement");
+    }
+    int next_tok_tag = next_tok->get_tag();
+    if (next_tok_tag == TOK_LOR || next_tok_Tag == TOK_LAND){
+        //TODO: create || node with ast and parse_R children
+        std::unique_ptr<Node> op(expect(static_cast<enum TokenKind>(next_tag)));
+        op->set_tag(tag == TOK_LOR ? AST_LOR : AST_LAND);
+        op->append_kid(ast);
+        op->append_kid(parse_R());
+        return op.realease();
+    }
+    return ast.release();
+}
+
+Node *Parse2::parse_R() {
+    Node *ast = parse_E();
+
+     Node *next_tok = m_lexer->peek();
+     if (next_tok == nullptr) {
+         SyntaxError::raise(m_lexer->get_current_loc(), "Unexpected end of input looking for statement");
+     }
+     int next_tok_tag = next_tok->get_tag();
+     bool op_found = false;
+     //R -> E X E
+     if (next_tok_tag == TOK_LL) { //X = <
+         std::unique_ptr<Node> op(expect(static_cast<enum TokenKind>(next_tag)));
+         op->set_tag(AST_LL);
+         op_found = true;
+     } else if (next_tok_tag == TOK_LLE) { //X = <=
+         std::unique_ptr<Node> op(expect(static_cast<enum TokenKind>(next_tag)));
+         op->set_tag(AST_LLE);
+         op_found = true;
+     } else if (next_tok_tag == TOK_G) { //X > 
+         std::unique_ptr<Node> op(expect(static_cast<enum TokenKind>(next_tag)));
+         op->set_tag(AST_LG);
+         op_found = true;
+     } else if (next_tok_tag == TOK_LGE) { //X = >=
+         std::unique_ptr<Node> op(expect(static_cast<enum TokenKind>(next_tag)));
+         op->set_tag(AST_LGE);
+         op_found = true;
+     } else if (next_tok_tag == TOK_LE) { //X = ==
+         std::unique_ptr<Node> op(expect(static_cast<enum TokenKind>(next_tag)));
+         op->set_tag(AST_LE);
+         op_found = true;
+     } else if (next_tok_tag == TOK_LNE) {//X = !=
+         std::unique_ptr<Node> op(expect(static_cast<enum TokenKind>(next_tag)));
+         op->set_tag(AST_LNE);
+         op_found = true;
+     }
+     if (op_found){
+         op->append_kid(ast);
+         op->append_kid(parse_E());
+         return op.release()
+     }
+     //Base Case of R -> E
+     return ast.release()
+}
+
 
 Node *Parser2::parse_E() {
   // E -> ^ T E'
@@ -181,9 +297,9 @@ Node *Parser2::parse_F() {
     ast->set_loc(tok->get_loc());
     return ast.release();
   } else if (tag == TOK_LPAREN) {
-    // F -> ^ ( E )
+    // F -> ^ ( A )
     expect_and_discard(TOK_LPAREN);
-    std::unique_ptr<Node> ast(parse_E());
+    std::unique_ptr<Node> ast(parse_A());
     expect_and_discard(TOK_RPAREN);
     return ast.release();
   } else {
