@@ -95,6 +95,18 @@ void Lexer::fill(int how_many) {
   }
 }
 
+int *Lexer::is_var(){
+    int a = read();
+    int r = read();
+    if (a == 'r' && r =='r'){//next chars are targets 
+        return 1;
+    } else {//next char is other
+        unread(r);
+        unread(a)
+        return 0;
+    }
+}
+
 Node *Lexer::read_token() {
   int c, line = -1, col = -1;
 
@@ -222,16 +234,5 @@ int *Lexer::choose_next(int c, int t){
     }
 }
 
-int *Lexer::is_var(){
-    int a = read();
-    int r = read();
-    if (a == 'r' && r =='r'){//next chars are targets 
-        return 1;
-    } else {//next char is other
-        unread(r);
-        unread(a)
-        return 0;
-    }
-}
 
 
