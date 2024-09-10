@@ -1,12 +1,13 @@
-var a ;
-var b ;
+var a;
+var b;
+var c;
 a = 11;
 b = 22;
-var c;
-c = (a * 4 < 55) && (b == 16 || b >= 9 + 13);
+var bc;
+c = (a * 4 < 55 + bc) && (b == 16 || b >= 9 + 13);
 c;
 var d;
 d = (a-b)/c != 22;
 var x;
+var e;
 x = a + b + c + d + e;
-;
