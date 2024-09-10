@@ -6,6 +6,7 @@
 #include "token.h"
 #include "exceptions.h"
 #include "lexer.h"
+#include <iostream> 
 
 ////////////////////////////////////////////////////////////////////////
 // Lexer implementation
@@ -95,16 +96,8 @@ void Lexer::fill(int how_many) {
   }
 }
 
-int *Lexer::is_var(){
-    int a = read();
-    int r = read();
-    if (a == 'r' && r =='r'){//next chars are targets 
-        return 1;
-    } else {//next char is other
-        unread(r);
-        unread(a)
-        return 0;
-    }
+int isNotLetterNorNumber(int c) {
+  return !std::isalpha(c) && !std::isdigit(c);
 }
 
 Node *Lexer::read_token() {
@@ -131,62 +124,79 @@ Node *Lexer::read_token() {
   if (isalpha(c)) {
     Node *tok = read_continued_token(TOK_IDENTIFIER, lexeme, line, col, isalnum);
     // TODO: use set_tag to change the token kind if it's actually a keyword
+    if (tok->get_str() == "var"){
+      tok->set_tag(TOK_VAR);
+    }
+    // std::cout << tok->get_str() <<std::endl;
     return tok;
   } else if (isdigit(c)) {
-    return read_continued_token(TOK_INTEGER_LITERAL, lexeme, line, col, isdigit);
+    Node *tok = read_continued_token(TOK_INTEGER_LITERAL, lexeme, line, col, isdigit);
+    // std::cout << tok->get_str() <<std::endl;
+    return tok;
   } else {
     switch (c) {
     case '+':
+      // std::cout << "+" <<std::endl;
       return token_create(TOK_PLUS, lexeme, line, col);
     case '-':
+      // std::cout << "-" <<std::endl;
       return token_create(TOK_MINUS, lexeme, line, col);
     case '*':
+      // std::cout << "*" <<std::endl;
       return token_create(TOK_TIMES, lexeme, line, col);
     case '/':
+      // std::cout << "/" <<std::endl;
       return token_create(TOK_DIVIDE, lexeme, line, col);
     case '(':
+      // std::cout << "(" <<std::endl;
       return token_create(TOK_LPAREN, lexeme, line, col);
     case ')':
+      // std::cout << ")" <<std::endl;
       return token_create(TOK_RPAREN, lexeme, line, col);
     case ';':
+      // std::cout << ";" <<std::endl;
       return token_create(TOK_SEMICOLON, lexeme, line, col);
     //added cases for other kinds of tokens
-    case 'v': //var token
-      if (is_var() == 1){
-          return token_create(TOK_VAR, lexeme, line, col);
-      } else{
-         SyntaxError::raise(get_current_loc(), "Unexpected character '%c'", read());
-      }
+    //TODO: fix double char lexeme's (hella BUSTED)
     case '=': //asignment or equivlance
       if (choose_next('=','=') == 0){
-        return token_create(TOK_ASSIGN, lexeme, line, col);
+        // std::cout << "=" <<std::endl;
+        return token_create(TOK_ASSIGN, "=", line, col);
       }
-      return token_create(TOK_LE, lexeme, line, col);
+      // std::cout << "==" <<std::endl;
+      return token_create(TOK_LE, "==", line, col);
     case '&': //Logical and
       if (choose_next('&','&') == 1){
-          return token_create(TOK_LAND, lexeme, line, col);
+        // std::cout << "&&" <<std::endl;
+        return token_create(TOK_LAND, "&&", line, col);
       } else{
-          SyntaxError::raise(get_current_loc(), "Unexpected character '%c'", read());
+        SyntaxError::raise(get_current_loc(), "Unexpected character '%c'", read());
       }
     case '|': //Logical or
       if (choose_next('|','|') == 1){
-          return token_create(TOK_LOR, lexeme, line, col);
+        // std::cout << "||" <<std::endl;
+        return token_create(TOK_LOR, "||", line, col);
       } else{
-          SyntaxError::raise(get_current_loc(), "Unexpected character '%c'", read());
+        SyntaxError::raise(get_current_loc(), "Unexpected character '%c'", read());
       }
     case '<'://Less than (or equal to)
       if (choose_next('<','=') == 0){
-        return token_create(TOK_LL, lexeme, line, col); 
+        // std::cout << "<" <<std::endl;
+        return token_create(TOK_LL, "<", line, col); 
       }
-      return token_create(TOK_LLE, lexeme, line, col);
+      // std::cout << "<=" <<std::endl;
+      return token_create(TOK_LLE, "<=", line, col);
     case '>'://Greater than (or equal to)
       if (choose_next('>','=') == 0){
-          return token_create(TOK_LG, lexeme, line, col);
+          // std::cout << ">" <<std::endl;
+          return token_create(TOK_LG, ">", line, col);
       }
-      return token_create(TOK_LGE, lexeme, line, col);
+      // std::cout << ">=" <<std::endl;
+      return token_create(TOK_LGE, ">=", line, col);
     case '!'://Logical Not Equals
       if (choose_next('!','=') == 1){
-          return token_create(TOK_LNE, lexeme, line, col);
+          // std::cout << "!=" <<std::endl;
+          return token_create(TOK_LNE, "!=", line, col);
       } else{
           SyntaxError::raise(get_current_loc(), "Unexpected character '%c'", read());
       }
@@ -203,6 +213,8 @@ Node *Lexer::token_create(enum TokenKind kind, const std::string &lexeme, int li
   token->set_loc(source_info);
   return token;
 }
+
+
 
 // Read the continuation of a (possibly) multi-character token, such as
 // an identifier or integer literal.  pred is a pointer to a predicate
@@ -224,7 +236,7 @@ Node *Lexer::read_continued_token(enum TokenKind kind, const std::string &lexeme
 }
 
 // TODO: implement additional member functions if necessary
-int *Lexer::choose_next(int c, int t){
+int Lexer::choose_next(int c, int t){
     int n = read();
     if (n == t){//next char is target 
         return 1;

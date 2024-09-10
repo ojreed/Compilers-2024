@@ -41,7 +41,7 @@ private:
   Node *read_continued_token(enum TokenKind kind, const std::string &lexeme_start, int line, int col, int (*pred)(int));
   // TODO: add additional member functions if necessary
   int choose_next(int c, int t);
-  int check_next(int c, int t);
+  int is_var();
 };
 
 #endif // LEXER_H

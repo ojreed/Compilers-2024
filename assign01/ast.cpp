@@ -26,26 +26,26 @@ std::string ASTTreePrint::node_tag_to_string(int tag) const {
   case AST_STATEMENT:
     return "STATEMENT";
   // TODO: add cases for other AST node kinds
-  case AST_VAR:
-    return "VARIABLE";
+  case AST_VARDEF:
+    return "VARDEF";
   case AST_ASSIGN:
-    return "ASSIGNMENT";
+    return "ASSIGN";
   case AST_LOR:
-    return "L_OR";
+    return "LOGICAL_OR";
   case AST_LAND:
-    return "L_AND";
+    return "LOGICAL_AND";
   case AST_LL:
-    return "L_LESS";
+    return "LT";
   case AST_LLE:
-    return "L_LESS_EQ";
+    return "LTE";
   case AST_LG:
-    return "L_GREAT";
+    return "GT";
   case AST_LGE:
-    return "L_GREAT_EQ";
+    return "GTE";
   case AST_LE:
-    return "L_EQ";
+    return "EQ";
   case AST_LNE:
-    return "L_NOT_EQ";
+    return "NEQ";
   default:
     RuntimeError::raise("Unknown AST node type %d\n", tag);
   }

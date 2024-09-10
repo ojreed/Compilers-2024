@@ -14,7 +14,7 @@ enum ASTKind {
   AST_UNIT,
   AST_STATEMENT,
   // TODO: add members for other AST node kinds
-  AST_VAR,
+  AST_VARDEF,
   AST_ASSIGN,
   AST_LOR,
   AST_LAND,
