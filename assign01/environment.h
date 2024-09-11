@@ -10,6 +10,7 @@ class Environment {
 private:
   Environment *m_parent;
   // TODO: representation of environment (map of names to values)
+  std::map<std::string,Value> var_map;
 
   // copy constructor and assignment operator prohibited
   Environment(const Environment &);
@@ -20,6 +21,10 @@ public:
   ~Environment();
 
   // TODO: add member functions allowing lookup, definition, and assignment
+  Value define(std::string var_name);
+  Value lookup(std::string var_name);
+  Value assign(std::string var_name,int val);
+  Value assign(std::string var_name,Value val);
 };
 
 #endif // ENVIRONMENT_H

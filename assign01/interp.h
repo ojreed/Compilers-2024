@@ -20,6 +20,7 @@ public:
 private:
   // TODO: private member functions
   std::vector<std::string> find_vars(Node *root);
+  Value exec_node(Environment* env,Node*);
 };
 
 #endif // INTERP_H

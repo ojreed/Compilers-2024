@@ -1,4 +1,4 @@
- #include <cassert>
+#include <cassert>
 #include <map>
 #include <string>
 #include <memory>
@@ -8,9 +8,9 @@
 #include "parser2.h"
 /*
 TODO LIST
-  0) ";" seg-faults
-  2) convert all to smart pointers
-  3) what does release do
+  0) convert all to smart pointers
+  1) what does release do
+  2) add comments
 */
 
 ////////////////////////////////////////////////////////////////////////
@@ -89,6 +89,7 @@ Node *Parser2::parse_Stmt() {
       //add VAR and IDENT
       Node* vardef(expect(static_cast<enum TokenKind>(next_tok_tag)));
       vardef->set_tag(AST_VARDEF);
+      vardef->set_str("");
       Node* varref(expect(TOK_IDENTIFIER));
       varref->set_tag(AST_VARREF);
       vardef->append_kid(varref);
@@ -99,7 +100,7 @@ Node *Parser2::parse_Stmt() {
   }
   //Always look for semicolon
   expect_and_discard(TOK_SEMICOLON);
-
+  s->set_str("");
   return s.release();
 }
 
@@ -126,6 +127,7 @@ Node *Parser2::parse_A() {
          ID->set_tag(AST_VARREF);
          assign->append_kid(ID);
          assign->append_kid(parse_A());
+         assign->set_str("");
          return assign;
     } else {
         return parse_L();
@@ -134,22 +136,28 @@ Node *Parser2::parse_A() {
 
 
 Node *Parser2::parse_L() {
-    Node *ast = parse_R();
-    
+    //L    → R || R
+    //L    → R && R
+    //L    → R
+
+    Node *ast = parse_R(); //Always parse a front R
+
     Node *next_tok = m_lexer->peek();
     if (next_tok == nullptr) {
         SyntaxError::raise(m_lexer->get_current_loc(), "Unexpected end of input looking for statement");
     }
+    //L    → R || R
+    //L    → R && R
     int next_tok_tag = next_tok->get_tag();
     if (next_tok_tag == TOK_LOR || next_tok_tag == TOK_LAND){
-        //TODO: create || node with ast and parse_R children
         std::unique_ptr<Node> op(expect(static_cast<enum TokenKind>(next_tok_tag)));
         op->set_tag(next_tok_tag == TOK_LOR ? AST_LOR : AST_LAND);
         op->append_kid(ast);
         op->append_kid(parse_R());
+        op->set_str("");
         return op.release();
     }
-    return ast; //TODO: what does release() do
+    return ast;
 }
 
 Node *Parser2::parse_R() {
@@ -160,7 +168,7 @@ Node *Parser2::parse_R() {
     }
     int next_tok_tag = next_tok->get_tag();
     bool op_found = false;
-    //R -> E X E
+    //R -> E [LOGICAL COMP] E
     std::unique_ptr<Node> op;
     if (next_tok_tag == TOK_LL) { //X = <
       op = std::unique_ptr<Node>(expect(static_cast<enum TokenKind>(next_tok_tag)));
@@ -187,9 +195,10 @@ Node *Parser2::parse_R() {
       op->set_tag(AST_LNE);
       op_found = true;
     }
-    if (op_found){
+    if (op_found){ //Shared work for all logical op types
         op->append_kid(ast);
         op->append_kid(parse_E());
+        op->set_str("");
         return op.release();
     }
     //Base Case of R -> E
