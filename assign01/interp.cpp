@@ -59,6 +59,7 @@ Value Interpreter::execute() {
     Node* statment = m_ast->get_kid(c);
     result = exec_node(env,statment); //store result in a value every iteration --> return at end
   }
+  delete env;
   return result;
 }
 
