@@ -1,0 +1,32 @@
+var g;
+g = 42;
+
+function f(x) {
+  x + g;
+}
+
+function q(x, y) {
+  var g;
+  g = 17;
+  f(x);
+}
+
+
+function test(){
+  10;
+}
+
+
+test()+test();
+
+q(1,2);
+
+if (a < b) {
+  100;
+}
+
+if (a < b) {
+  100;
+} else {
+    var test;
+}

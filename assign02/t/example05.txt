@@ -1,0 +1,18 @@
+if (readint() == 1) {
+  var i;
+  i = 0;
+  while (i < 5) {
+    i = i + 1;
+  }
+  i;
+} else {
+  var j;
+  var i;
+  j = 1;
+  i = 0;
+  while (j < 10) {
+    i = i + 1;
+    j = j*2;
+  }
+  i;
+}

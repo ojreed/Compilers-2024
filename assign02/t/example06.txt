@@ -1,0 +1,6 @@
+var i;
+i = 1;
+if (readint()==readint()) {
+  i=2;
+}
+println(i);
