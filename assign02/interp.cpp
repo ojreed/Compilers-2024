@@ -236,12 +236,12 @@ Value Interpreter::exec_node(Environment* env,Node* node){
   } else if (node->get_tag() == AST_STATEMENT_LIST){
     Value result;
     int statements = node->get_num_kids();
-    Environment* child_env = new Environment(env);
+    Environment* child_env = new Environment(env); //setup a new child env for inside blocks
     for (int c = 0; c < statements; c++){ //for every statment in our code we what to evaluate that statment
       Node* statment = node->get_kid(c);
       result = exec_node(child_env,statment); //store result in a value every iteration --> return at end
     }
-    delete child_env;
+    delete child_env; //destroy child env
     return result;
   } else if (node->get_tag() == AST_FUNC) {
     return Value(0); //TODO: for MS2
