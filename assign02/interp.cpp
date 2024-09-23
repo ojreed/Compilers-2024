@@ -166,16 +166,24 @@ Value Interpreter::exec_node(Environment* env,Node* node){
     Value rhs = exec_node(env,node->get_kid(1));
     return Value(lhs.get_ival()!=rhs.get_ival());
   } else if (node->get_tag() == AST_IF){ //Start: control flow
-    if (exec_node(env,node->get_kid(0)).get_ival() != 0) {
+    Value condition = exec_node(env,node->get_kid(0)).get_ival();
+    if (!condition.is_numeric()){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
+    if (condition.get_ival() != 0) {
       exec_node(env,node->get_kid(1)); //evaluate the IF side AST_SLIST
     } else if (node->get_num_kids() == 3){
       exec_node(env,node->get_kid(2)->get_kid(0)); //evaluate the ELSE side AST_SLIST (if it exists)
     }
     return Value(0);
   } else if (node->get_tag() == AST_WHILE){ 
-    Value cur_val = Value(0);
-    while (exec_node(env,node->get_kid(0)).get_ival() != 0) {
-      cur_val = exec_node(env,node->get_kid(1));
+    Value condition = exec_node(env,node->get_kid(0)).get_ival();
+    if (!condition.is_numeric()){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
+    while (condition.get_ival() != 0) {
+      exec_node(env,node->get_kid(1));
+      condition = exec_node(env,node->get_kid(0)).get_ival();
     } 
     return Value(0);
   } else if (node->get_tag() == AST_STATEMENT_LIST){

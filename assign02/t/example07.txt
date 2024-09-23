@@ -1,1 +1,2 @@
-print(hello);
+var a;
+a = 24;
