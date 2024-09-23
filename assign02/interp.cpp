@@ -107,63 +107,108 @@ Value Interpreter::exec_node(Environment* env,Node* node){
     return env->lookup(node->get_str());
   }else if (node->get_tag() == AST_ASSIGN){
     Value rhs = exec_node(env,node->get_kid(1));
+    if (!rhs.is_numeric()){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     return env->assign(node->get_kid(0)->get_str(),rhs);
   } else if (node->get_tag() == AST_ADD){ //START: ARITH OPS
     Value lhs = exec_node(env,node->get_kid(0));
     Value rhs = exec_node(env,node->get_kid(1));
+    if (!rhs.is_numeric() || !lhs.is_numeric() ){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     return Value(lhs.get_ival()+rhs.get_ival());
   } else if (node->get_tag() == AST_SUB){
     Value lhs = exec_node(env,node->get_kid(0));
     Value rhs = exec_node(env,node->get_kid(1));
+    if (!rhs.is_numeric() || !lhs.is_numeric() ){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     return Value(lhs.get_ival()-rhs.get_ival());
   } else if (node->get_tag() == AST_MULTIPLY){
     Value lhs = exec_node(env,node->get_kid(0));
     Value rhs = exec_node(env,node->get_kid(1));
+    if (!rhs.is_numeric() || !lhs.is_numeric() ){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     return Value(lhs.get_ival()*rhs.get_ival());
   } else if (node->get_tag() == AST_DIVIDE){
     Value lhs = exec_node(env,node->get_kid(0));
     Value rhs = exec_node(env,node->get_kid(1));
+    if (!rhs.is_numeric() || !lhs.is_numeric() ){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     if (rhs.get_ival() == 0) {
       EvaluationError::raise(node->get_loc(),"Attempted to divide by zero");
     } 
     return Value(lhs.get_ival()/rhs.get_ival());
   } else if (node->get_tag() == AST_LOR){ //START: LOGIC OPS
     Value lhs = exec_node(env,node->get_kid(0));
+    if (!lhs.is_numeric()){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     if (lhs.get_ival()) { //shortcut for or
       return Value(1);
     }
     Value rhs = exec_node(env,node->get_kid(1));
+    if (!rhs.is_numeric()){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     return Value(lhs.get_ival()||rhs.get_ival());
   } else if (node->get_tag() == AST_LAND){
     Value lhs = exec_node(env,node->get_kid(0));
+    if (!lhs.is_numeric()){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     if (!lhs.get_ival()) { //shortcut for and
       return Value(0);
     }
     Value rhs = exec_node(env,node->get_kid(1));
+    if (!rhs.is_numeric()){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     return Value(lhs.get_ival()&&rhs.get_ival());
   } else if (node->get_tag() == AST_LL){
     Value lhs = exec_node(env,node->get_kid(0));
     Value rhs = exec_node(env,node->get_kid(1));
+    if (!rhs.is_numeric() || !lhs.is_numeric() ){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     return Value(lhs.get_ival()<rhs.get_ival());
   } else if (node->get_tag() == AST_LLE){
     Value lhs = exec_node(env,node->get_kid(0));
     Value rhs = exec_node(env,node->get_kid(1));
+    if (!rhs.is_numeric() || !lhs.is_numeric() ){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     return Value(lhs.get_ival()<=rhs.get_ival());
   } else if (node->get_tag() == AST_LG){
     Value lhs = exec_node(env,node->get_kid(0));
     Value rhs = exec_node(env,node->get_kid(1));
+    if (!rhs.is_numeric() || !lhs.is_numeric() ){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     return Value(lhs.get_ival()>rhs.get_ival());
   } else if (node->get_tag() == AST_LGE){
     Value lhs = exec_node(env,node->get_kid(0));
     Value rhs = exec_node(env,node->get_kid(1));
+    if (!rhs.is_numeric() || !lhs.is_numeric() ){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     return Value(lhs.get_ival()>=rhs.get_ival());
   } else if (node->get_tag() == AST_LE){
     Value lhs = exec_node(env,node->get_kid(0));
     Value rhs = exec_node(env,node->get_kid(1));
+    if (!rhs.is_numeric() || !lhs.is_numeric() ){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     return Value(lhs.get_ival()==rhs.get_ival());
   } else if (node->get_tag() == AST_LNE){
     Value lhs = exec_node(env,node->get_kid(0));
     Value rhs = exec_node(env,node->get_kid(1));
+    if (!rhs.is_numeric() || !lhs.is_numeric() ){
+      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
+    }
     return Value(lhs.get_ival()!=rhs.get_ival());
   } else if (node->get_tag() == AST_IF){ //Start: control flow
     Value condition = exec_node(env,node->get_kid(0));
