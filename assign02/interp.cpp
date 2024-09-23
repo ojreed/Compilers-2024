@@ -107,9 +107,6 @@ Value Interpreter::exec_node(Environment* env,Node* node){
     return env->lookup(node->get_str());
   }else if (node->get_tag() == AST_ASSIGN){
     Value rhs = exec_node(env,node->get_kid(1));
-    if (!rhs.is_numeric()){
-      EvaluationError::raise(node->get_loc(), "Contitional output is non-numeric");
-    }
     return env->assign(node->get_kid(0)->get_str(),rhs);
   } else if (node->get_tag() == AST_ADD){ //START: ARITH OPS
     Value lhs = exec_node(env,node->get_kid(0));
