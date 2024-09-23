@@ -70,6 +70,9 @@ Value Interpreter::intrinsic_println(Value args[], unsigned num_args,
 Value Interpreter::intrinsic_readint(Value args[], unsigned num_args, 
   const Location &loc, Interpreter *interp){
   int i;
+  if (num_args != 0)
+    EvaluationError::raise(
+      loc, "Wrong number of arguments passed to print function");
   scanf("%d",&i);
   return Value(i);
 }
