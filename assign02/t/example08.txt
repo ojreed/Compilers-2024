@@ -22,3 +22,5 @@ function x(a,b,c){
 }
 x = 5;
 g = 1;
+x = mkarr();
+print(x);

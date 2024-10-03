@@ -92,7 +92,7 @@ std::string Value::as_str() const {
       int length = arr->len().get_ival();
       std::string arr_out = "[";
       for (int i = 0; i < length; i++){
-        arr_out += std::to_string(arr->get(i).get_ival());
+        arr_out += arr->get(i).as_str();
         if (i < length - 1){
           arr_out += ", ";
         }

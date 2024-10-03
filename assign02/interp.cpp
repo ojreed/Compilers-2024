@@ -19,6 +19,12 @@ Interpreter::~Interpreter() {
   delete m_ast;
 }
 
+/*
+
+  Semantic Validation
+
+*/
+
 void Interpreter::analyze() {
   std::set<std::string> seen_vars;
   //handle intrinsics
@@ -66,6 +72,11 @@ void Interpreter::analyze_scope(std::set<std::string>& seen_vars, Node *root) {
   }
 }
 
+/*
+
+  Intrinsic functions
+
+*/
 
 Value Interpreter::intrinsic_print(
   Value args[], unsigned num_args,
@@ -96,8 +107,13 @@ Value Interpreter::intrinsic_readint(Value args[], unsigned num_args,
   return Value(i);
 }
 
+/*
 
-Value Interpreter::intrinsic_mkarr(
+  Array Intrinsic functions
+
+*/
+
+Value Interpreter::intrinsic_mkarr(//intrinsic function to create an array
   Value args[], unsigned num_args,
   const Location &loc, Interpreter *interp) {
   if (num_args == 0){
@@ -109,7 +125,7 @@ Value Interpreter::intrinsic_mkarr(
   Value arrval = new ArrayVal(vec);
   return arrval;
 }
-Value Interpreter::intrinsic_len(
+Value Interpreter::intrinsic_len(//intrinsic function to manage array len
   Value args[], unsigned num_args,
   const Location &loc, Interpreter *interp) {
   if (num_args != 1)
@@ -120,7 +136,7 @@ Value Interpreter::intrinsic_len(
       loc, "Input is not an array");
   return Value(args[0].get_arr()->len());
 }
-Value Interpreter::intrinsic_get(
+Value Interpreter::intrinsic_get(//intrinsic function to manage array get
   Value args[], unsigned num_args,
   const Location &loc, Interpreter *interp) {
   if (num_args != 2)
@@ -137,7 +153,7 @@ Value Interpreter::intrinsic_get(
       loc, "index out of bounds");
   return args[0].get_arr()->get(args[1].get_ival());
 }
-Value Interpreter::intrinsic_set(
+Value Interpreter::intrinsic_set(//intrinsic function to manage array set
   Value args[], unsigned num_args,
   const Location &loc, Interpreter *interp) {
   if (num_args != 3)
@@ -155,7 +171,7 @@ Value Interpreter::intrinsic_set(
   args[0].get_arr()->set(args[1].get_ival(),args[2]);
   return Value();
 }
-Value Interpreter::intrinsic_push(
+Value Interpreter::intrinsic_push(//intrinsic function to manage array push
   Value args[], unsigned num_args,
   const Location &loc, Interpreter *interp) {
   if (num_args != 2)
@@ -167,7 +183,7 @@ Value Interpreter::intrinsic_push(
   args[0].get_arr()->push(args[1]);
   return Value();
 }
-Value Interpreter::intrinsic_pop(
+Value Interpreter::intrinsic_pop( //intrinsic function to manage array pop
     Value args[], unsigned num_args,
   const Location &loc, Interpreter *interp) {
   if (num_args != 1)
@@ -206,6 +222,21 @@ Value Interpreter::execute() {
   delete global;
   return result;
 }
+
+/*
+  NOTE TO MY POOR CAs: 
+
+  I know this is a terrible way to organize this code.
+  I know I got feedback on it for Assigment 1 BUT it works and I 
+  ignored that feedback because I am having a comically busy week and wanted to focus on 
+  implementing the project and keeping up with work and not doing software carpentry.
+  Not to say that the changes wouldnt be important or a useful excercize. I just
+  simply did not have that kind of time. 
+
+  Best,
+
+  Owen Reed
+*/
 
 //takes a given node in the AST and interprets its meaning recursivly
 Value Interpreter::exec_node(Environment* env,Node* node){
@@ -357,7 +388,6 @@ Value Interpreter::exec_node(Environment* env,Node* node){
     return result;
   } else if (node->get_tag() == AST_FUNC) {//Start: functions
     std::string fn_name = node->get_kid(0)->get_str();//get function name from def
-
     int a = (node->get_num_kids() == 3) ? 2 : 1;
     std::vector<std::string> params;
     if (a == 2) { //if there is a parameter list
@@ -368,20 +398,21 @@ Value Interpreter::exec_node(Environment* env,Node* node){
       }
     }
     Node* stmt_list = node->get_kid(a); //get function body
-
     //assemble function and bind
     Value fn_value = new Function(fn_name,params,env,stmt_list);
     env->bind(fn_name,fn_value);
     return Value(0); 
   } else if (node->get_tag() == AST_FNCALL) {
-    Value output;
-    Environment* fn_call_env = new Environment(env);
+    Value output; //eventual value to be returned
+    Environment* fn_call_env = new Environment(env);//parameter space enviornment
     std::string fn_name = node->get_kid(0)->get_str(); //function identifier 
-    Value v_fn = env->fn_call(fn_name);
+    Value v_fn = env->fn_call(fn_name);//get our target function (validate that is is a function)
+    //get number of args
     unsigned num_args = 0;
     if (node->get_num_kids() > 1){
       num_args = node->get_kid(1)->get_num_kids(); //number of children in arglist
     }
+    //gather and evaulate input parameters
     Value args[num_args]; 
     for (unsigned i = 0; i < num_args; i+=1){
       //store evaluated arg for each arg in arglist
@@ -389,21 +420,21 @@ Value Interpreter::exec_node(Environment* env,Node* node){
     }
     const Location &loc = node->get_loc(); 
     Interpreter *interp = this;
-    if (v_fn.get_kind() == VALUE_INTRINSIC_FN){
+    if (v_fn.get_kind() == VALUE_INTRINSIC_FN){ //trivially evaluate intrinsics 
       IntrinsicFn fn = v_fn.get_intrinsic_fn();
       output = fn(args,num_args,loc,interp);
-    } else {
-      Node* entry_point = v_fn.get_function()->get_body();
-      std::vector<std::string> p_names = v_fn.get_function()->get_params();
+    } else { //evaluate cusom functions by node execution
+      Node* entry_point = v_fn.get_function()->get_body(); //entry to the defined function
+      std::vector<std::string> p_names = v_fn.get_function()->get_params(); //list of expected parameters
       if (p_names.size() != num_args) {
         EvaluationError::raise(node->get_loc(), "Incorect number of function argumnets. Expected %ld, given %d.",p_names.size(),num_args);
       }
-      Environment* body_env = new Environment(v_fn.get_function()->get_parent_env());
-      for (unsigned i = 0; i < num_args; i+=1){
+      Environment* body_env = new Environment(v_fn.get_function()->get_parent_env());//function body enviornment 
+      for (unsigned i = 0; i < num_args; i+=1){ //establish proper inputs to function
         body_env->define(p_names[i]);
         body_env->assign(p_names[i],args[i]);
       }
-      output = exec_node(body_env,entry_point);
+      output = exec_node(body_env,entry_point); //evaluate the nodes of the function
       delete body_env;
     } 
     delete fn_call_env;

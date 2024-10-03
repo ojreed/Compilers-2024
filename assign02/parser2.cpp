@@ -7,12 +7,7 @@
 #include "ast.h"
 #include "exceptions.h"
 #include "parser2.h"
-/*
-TODO LIST
-  0) fix optional input
-  1) fix if/else
-  2) convert all to smart pointers
-*/
+
 
 ////////////////////////////////////////////////////////////////////////
 // Parser2 implementation
