@@ -303,6 +303,7 @@ Value Interpreter::exec_node(Environment* env,Node* node){
         body_env->assign(p_names[i],args[i]);
       }
       output = exec_node(body_env,entry_point);
+      delete body_env;
     } 
     delete fn_call_env;
     return output;
