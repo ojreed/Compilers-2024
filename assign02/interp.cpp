@@ -30,6 +30,17 @@ void Interpreter::analyze() {
 void Interpreter::analyze_scope(std::set<std::string>& seen_vars, Node *root) {
   if (root->get_tag() == AST_VARDEF) {//if our statment is a var declaration
     seen_vars.insert(root->get_kid(0)->get_str());//save the name of the declared var
+  } else if (root->get_tag() == AST_FUNC){
+    seen_vars.insert(root->get_kid(0)->get_str());
+    unsigned num_args = 0;
+    if (root->get_num_kids() == 3){
+      num_args = root->get_kid(1)->get_num_kids(); //number of children in arglist
+    }
+    seen_vars = std::set<std::string>(seen_vars);
+    for (unsigned i = 0; i < num_args; i+=1){
+      //store evaluated arg for each arg in arglist
+      seen_vars.insert(root->get_kid(1)->get_kid(i)->get_str());
+    }
   } else {//if our statment is a var declaration
     if (root->get_tag() == AST_VARREF && seen_vars.find(root->get_str()) == seen_vars.end()) {//if we havent raise an error on it
       SemanticError::raise(root->get_loc(), "Undefined variable '%s'", root->get_str().c_str());
@@ -244,28 +255,58 @@ Value Interpreter::exec_node(Environment* env,Node* node){
     delete child_env; //destroy child env
     return result;
   } else if (node->get_tag() == AST_FUNC) {
-    return Value(0); //TODO: for MS2
-  } else if (node->get_tag() == AST_FNCALL) {
-    std::string fn_name = node->get_kid(0)->get_str(); //function identifier 
-    if (node->get_num_kids() > 1){
-      unsigned num_args = node->get_kid(1)->get_num_kids(); //number of children in arglist
-      Value args[num_args]; 
-      for (unsigned i = 0; i < num_args; i+=1){
-        //store evaluated arg for each arg in arglist
-        args[i] = exec_node(env,node->get_kid(1)->get_kid(i));
+    std::string fn_name = node->get_kid(0)->get_str();//get function name from def
+
+    int a = (node->get_num_kids() == 3) ? 2 : 1;
+    std::vector<std::string> params;
+    if (a == 2) { //if there is a parameter list
+      //generate a list of function parameter strings
+      Node* param_list = node->get_kid(a-1);
+      for (unsigned i = 0; i< param_list->get_num_kids(); i++){
+        params.push_back(param_list->get_kid(i)->get_str());
       }
-      const Location &loc = node->get_loc(); 
-      Interpreter *interp = this;
-      return env->fn_call(fn_name,args,num_args,loc,interp);
-    } else {
-      unsigned num_args = 0;
-      Value args[num_args]; 
-      const Location &loc = node->get_loc(); 
-      Interpreter *interp = this;
-      return env->fn_call(fn_name,args,num_args,loc,interp);
     }
-    
-  }
+    Node* stmt_list = node->get_kid(a); //get function body
+
+    //assemble function and bind
+    Value fn_value = new Function(fn_name,params,env,stmt_list);
+    env->bind(fn_name,fn_value);
+    return Value(0); 
+  } else if (node->get_tag() == AST_FNCALL) {
+    Value output;
+    Environment* fn_call_env = new Environment(env);
+    std::string fn_name = node->get_kid(0)->get_str(); //function identifier 
+    Value v_fn = env->fn_call(fn_name);
+    unsigned num_args = 0;
+    if (node->get_num_kids() > 1){
+      num_args = node->get_kid(1)->get_num_kids(); //number of children in arglist
+    }
+    Value args[num_args]; 
+    for (unsigned i = 0; i < num_args; i+=1){
+      //store evaluated arg for each arg in arglist
+      args[i] = exec_node(fn_call_env,node->get_kid(1)->get_kid(i));
+    }
+    const Location &loc = node->get_loc(); 
+    Interpreter *interp = this;
+    if (v_fn.get_kind() == VALUE_INTRINSIC_FN){
+      IntrinsicFn fn = v_fn.get_intrinsic_fn();
+      output = fn(args,num_args,loc,interp);
+    } else {
+      Node* entry_point = v_fn.get_function()->get_body();
+      std::vector<std::string> p_names = v_fn.get_function()->get_params();
+      if (p_names.size() != num_args) {
+        EvaluationError::raise(node->get_loc(), "Incorect number of function argumnets. Expected %ld, given %d.",p_names.size(),num_args);
+      }
+      Environment* body_env = new Environment(v_fn.get_function()->get_parent_env());
+      for (unsigned i = 0; i < num_args; i+=1){
+        body_env->define(p_names[i]);
+        body_env->assign(p_names[i],args[i]);
+      }
+      output = exec_node(body_env,entry_point);
+    } 
+    delete fn_call_env;
+    return output;
+  } 
   return Value(0);
 }
 

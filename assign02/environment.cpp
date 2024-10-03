@@ -45,19 +45,15 @@ void Environment::bind(std::string fn_name, Value fn){
   var_map[fn_name]= fn;
 }
 
-Value Environment::fn_call(std::string fn_name, Value args[], unsigned num_args, 
-  const Location &loc, Interpreter *interp){
+Value Environment::fn_call(std::string fn_name){
   if (var_map.count(fn_name) == 0){
-    return m_parent->fn_call(fn_name, args, num_args, loc, interp);
+    return m_parent->fn_call(fn_name);
   }
   Value v_fn = var_map[fn_name];
   if (v_fn.get_kind() != VALUE_INTRINSIC_FN && v_fn.get_kind() != VALUE_FUNCTION) {
-    RuntimeError::raise("Bound object %s is not a function",fn_name.c_str());
-  } else if (v_fn.get_kind() == VALUE_INTRINSIC_FN) {
-    IntrinsicFn fn = v_fn.get_intrinsic_fn();
-    return Value(fn(args, num_args, loc,  interp));
-  } else if (v_fn.get_kind() == VALUE_FUNCTION) {
-    return Value(0);
+    RuntimeError::raise("Object %s is not a function",fn_name.c_str());
+  } else {
+    return v_fn;
   }
   return Value(0);
 }

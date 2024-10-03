@@ -26,7 +26,7 @@ public:
   Value assign(std::string var_name,int val);
   Value assign(std::string var_name,Value val);
   void bind(std::string fn_name,Value fn);
-  Value fn_call(std::string fn_name, Value args[], unsigned num_args, const Location &loc, Interpreter *interp);
+  Value fn_call(std::string fn_name);
 };
 
 #endif // ENVIRONMENT_H
