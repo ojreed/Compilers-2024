@@ -8,6 +8,7 @@
 #include "node.h"
 #include "exceptions.h"
 #include "function.h"
+#include "arr.h"
 #include "interp.h"
 
 Interpreter::Interpreter(Node *ast_to_adopt)
@@ -24,6 +25,13 @@ void Interpreter::analyze() {
   seen_vars.insert("print");
   seen_vars.insert("println");
   seen_vars.insert("readint");
+  //arr intrinsics
+  seen_vars.insert("mkarr");
+  seen_vars.insert("len");
+  seen_vars.insert("get");
+  seen_vars.insert("set");
+  seen_vars.insert("push");
+  seen_vars.insert("pop");
   analyze_scope(seen_vars,m_ast);
 }
 
@@ -88,12 +96,105 @@ Value Interpreter::intrinsic_readint(Value args[], unsigned num_args,
   return Value(i);
 }
 
+
+Value Interpreter::intrinsic_mkarr(
+  Value args[], unsigned num_args,
+  const Location &loc, Interpreter *interp) {
+  if (num_args == 0){
+    std::vector<Value> vec;
+    Value arrval = new ArrayVal(vec);
+    return arrval;
+  }
+  std::vector<Value> vec(args, args + num_args);
+  Value arrval = new ArrayVal(vec);
+  return arrval;
+}
+Value Interpreter::intrinsic_len(
+  Value args[], unsigned num_args,
+  const Location &loc, Interpreter *interp) {
+  if (num_args != 1)
+    EvaluationError::raise(
+      loc, "Wrong number of arguments passed to print function");
+  if (args[0].get_kind() != VALUE_ARR)
+    EvaluationError::raise(
+      loc, "Input is not an array");
+  return Value(args[0].get_arr()->len());
+}
+Value Interpreter::intrinsic_get(
+  Value args[], unsigned num_args,
+  const Location &loc, Interpreter *interp) {
+  if (num_args != 2)
+    EvaluationError::raise(
+      loc, "Wrong number of arguments passed to print function");
+  if (args[0].get_kind() != VALUE_ARR)
+    EvaluationError::raise(
+      loc, "Input 0 is not an array");
+  if (args[1].get_kind() != VALUE_INT)
+    EvaluationError::raise(
+      loc, "Input 1 is not an int");
+  if (args[1].get_ival() >= args[0].get_arr()->len().get_ival() || args[1].get_ival() < 0)
+    EvaluationError::raise(
+      loc, "index out of bounds");
+  return args[0].get_arr()->get(args[1].get_ival());
+}
+Value Interpreter::intrinsic_set(
+  Value args[], unsigned num_args,
+  const Location &loc, Interpreter *interp) {
+  if (num_args != 3)
+    EvaluationError::raise(
+      loc, "Wrong number of arguments passed to print function");
+  if (args[0].get_kind() != VALUE_ARR)
+    EvaluationError::raise(
+      loc, "Input 0 is not an array");
+  if (args[1].get_kind() != VALUE_INT)
+    EvaluationError::raise(
+      loc, "Input 1 is not an int");
+  if (args[1].get_ival() >= args[0].get_arr()->len().get_ival() || args[1].get_ival() < 0)
+    EvaluationError::raise(
+      loc, "index out of bounds");
+  args[0].get_arr()->set(args[1].get_ival(),args[2]);
+  return Value();
+}
+Value Interpreter::intrinsic_push(
+  Value args[], unsigned num_args,
+  const Location &loc, Interpreter *interp) {
+  if (num_args != 2)
+    EvaluationError::raise(
+      loc, "Wrong number of arguments passed to print function");
+  if (args[0].get_kind() != VALUE_ARR)
+    EvaluationError::raise(
+      loc, "Input is not an array");
+  args[0].get_arr()->push(args[1]);
+  return Value();
+}
+Value Interpreter::intrinsic_pop(
+    Value args[], unsigned num_args,
+  const Location &loc, Interpreter *interp) {
+  if (num_args != 1)
+    EvaluationError::raise(
+      loc, "Wrong number of arguments passed to print function");
+  if (args[0].get_kind() != VALUE_ARR)
+    EvaluationError::raise(
+      loc, "Input is not an array");
+  if (args[0].get_arr()->len().get_ival() == 0)
+    EvaluationError::raise(
+      loc, "Attempting to pop an empty array");
+  return Value(args[0].get_arr()->pop());
+}
+
 Value Interpreter::execute() {
   Environment* global = new Environment();
   //Add intrinsics 
   global->bind("print", Value(&intrinsic_print));
   global->bind("println", Value(&intrinsic_println));
   global->bind("readint", Value(&intrinsic_readint));
+  //array intrinsics
+  global->bind("mkarr", Value(&intrinsic_mkarr));
+  global->bind("len", Value(&intrinsic_len));
+  global->bind("get", Value(&intrinsic_get));
+  global->bind("set", Value(&intrinsic_set));
+  global->bind("push", Value(&intrinsic_push));
+  global->bind("pop", Value(&intrinsic_pop));
 
   Value result;
   int statements = m_ast->get_num_kids();
@@ -254,7 +355,7 @@ Value Interpreter::exec_node(Environment* env,Node* node){
     }
     delete child_env; //destroy child env
     return result;
-  } else if (node->get_tag() == AST_FUNC) {
+  } else if (node->get_tag() == AST_FUNC) {//Start: functions
     std::string fn_name = node->get_kid(0)->get_str();//get function name from def
 
     int a = (node->get_num_kids() == 3) ? 2 : 1;

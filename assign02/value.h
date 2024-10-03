@@ -5,6 +5,7 @@
 #include <string>
 class ValRep;
 class Function;
+class ArrayVal;
 
 enum ValueKind {
   // "atomic" values
@@ -16,6 +17,7 @@ enum ValueKind {
   // object (drived from ValRep)
   VALUE_FUNCTION,
   // could add other kinds of dynamic values here
+  VALUE_ARR,
 };
 
 // Typedef of the signature of an intrinsic function.
@@ -49,6 +51,7 @@ public:
   Value(Function *fn);
   Value(IntrinsicFn intrinsic_fn);
   Value(const Value &other);
+  Value(ArrayVal *arr);
   ~Value();
 
   Value &operator=(const Value &rhs);
@@ -65,6 +68,7 @@ public:
   }
 
   Function *get_function() const;
+  ArrayVal *get_arr();
 
   IntrinsicFn get_intrinsic_fn() const {
     assert(m_kind == VALUE_INTRINSIC_FN);

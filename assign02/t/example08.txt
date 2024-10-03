@@ -1,14 +1,24 @@
 var g;
-g = 42;
-
-function f(x) {
-  x + g;
+g = mkarr(1,2,3,2,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,1,2,3,2,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,1,2,3,2,3,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4);
+function x(a,b,c){
+    print(1);
+    print(1);
+    print(1);
+    print(1);
+    print(1);
+    print(1);
+    print(1);
+    print(1);
+    print(1);
+    print(1);
+    print(1);
+    print(1);
+    print(1);
+    print(1);
+    print(1);
+    print(1);
+    print(1);
+    print(1);
 }
-
-function q(x) {
-  var g;
-  g = 17;
-  f(x);
-}
-
-q(1);
+x = 5;
+g = 1;

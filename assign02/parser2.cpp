@@ -344,13 +344,14 @@ Node *Parser2::parse_A() {
     if (next_tok_tag == TOK_IDENTIFIER && next_next_tok_tag == TOK_ASSIGN) {
         //Assign <- ID and A
          Node* ID(expect(static_cast<enum TokenKind>(next_tok_tag)));
-         Node* assign(expect(static_cast<enum TokenKind>(next_next_tok_tag)));
+         
+         std::unique_ptr<Node> assign(expect(static_cast<enum TokenKind>(next_next_tok_tag)));
          assign->set_tag(AST_ASSIGN);
          ID->set_tag(AST_VARREF);
          assign->append_kid(ID);
          assign->append_kid(parse_A());
          assign->set_str("");
-         return assign;
+         return assign.release();
     } else {
         return parse_L();
     }
@@ -362,7 +363,7 @@ Node *Parser2::parse_L() {
     //L    → R && R
     //L    → R
 
-    Node *ast = parse_R(); //Always parse a front R
+    std::unique_ptr<Node> ast(parse_R()); //Always parse a front R
 
     Node *next_tok = m_lexer->peek();
     if (next_tok == nullptr) {
@@ -374,16 +375,16 @@ Node *Parser2::parse_L() {
     if (next_tok_tag == TOK_LOR || next_tok_tag == TOK_LAND){
         std::unique_ptr<Node> op(expect(static_cast<enum TokenKind>(next_tok_tag)));
         op->set_tag(next_tok_tag == TOK_LOR ? AST_LOR : AST_LAND);
-        op->append_kid(ast);
+        op->append_kid(ast.release());
         op->append_kid(parse_R());
         op->set_str("");
         return op.release();
     }
-    return ast;
+    return ast.release();
 }
 
 Node *Parser2::parse_R() {
-    Node *ast = parse_E();
+    std::unique_ptr<Node> ast(parse_E());
     Node *next_tok = m_lexer->peek();
     if (next_tok == nullptr) {
       SyntaxError::raise(m_lexer->get_current_loc(), "Unexpected end of input looking for statement");
@@ -418,13 +419,13 @@ Node *Parser2::parse_R() {
       op_found = true;
     }
     if (op_found){ //Shared work for all logical op types
-        op->append_kid(ast);
+        op->append_kid(ast.release());
         op->append_kid(parse_E());
         op->set_str("");
         return op.release();
     }
     //Base Case of R -> E
-    return ast;
+    return ast.release();
 }
 
 Node *Parser2::parse_E() {
