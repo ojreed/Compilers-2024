@@ -29,6 +29,8 @@
 #include "symtab.h"
 #include "ast_visitor.h"
 
+enum class SymbolKind;
+
 class SemanticAnalysis : public ASTVisitor {
 public:
   typedef std::vector<SymbolTable *> SymbolTableList;
@@ -84,6 +86,18 @@ private:
   void leave_scope();
 
   // TODO: add helper functions
+  SymbolTable* find_symbol_table_by_name(const std::string& name);
 };
+
+
+bool is_same_type(Symbol* a, Symbol* b);
+
+bool is_same_type(std::shared_ptr<Type> a, std::shared_ptr<Type> b);
+
+bool is_same_type(Symbol* a, std::shared_ptr<Type> b);
+
+bool is_same_type(std::shared_ptr<Type> a, Symbol* b);
+
+void test_assignment(Node* n, std::shared_ptr<Type> lhs, std::shared_ptr<Type> rhs);
 
 #endif // SEMANTIC_ANALYSIS_H

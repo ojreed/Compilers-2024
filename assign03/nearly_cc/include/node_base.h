@@ -44,12 +44,19 @@ private:
   // copy ctor and assignment operator not supported
   NodeBase(const NodeBase &);
   NodeBase &operator=(const NodeBase &);
+  std::shared_ptr<Type> m_type;
+  Symbol* m_symbol;
 
 public:
   NodeBase();
   virtual ~NodeBase();
-
   // TODO: add member functions
+  void set_symbol(Symbol *symbol);
+  void set_type(const std::shared_ptr<Type> &type);
+  void reset_type(const std::shared_ptr<Type> &type);
+  bool has_symbol() const;
+  Symbol* get_symbol() const;
+  std::shared_ptr<Type> get_type() const;
 };
 
 #endif // NODE_BASE_H

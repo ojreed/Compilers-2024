@@ -157,3 +157,10 @@ int SymbolTable::get_depth() const {
 }
 
 // TODO: add helper functions
+void SymbolTable::remove_entry(unsigned index){
+  assert(index < get_num_entries());
+  Symbol* target = get_entry(index);
+  m_symbols.erase(m_symbols.begin() + index);
+  m_lookup.erase(target->get_name());
+  delete target;
+}

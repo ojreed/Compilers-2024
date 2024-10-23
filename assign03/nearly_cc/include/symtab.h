@@ -134,6 +134,8 @@ public:
 
   int get_depth() const;
 
+  void remove_entry(unsigned index);
+
 private:
   // TODO: add helper functions
 };
