@@ -22,7 +22,6 @@
 #include <algorithm>
 #include <utility>
 #include <map>
-#include <format>
 #include "grammar_symbols.h"
 #include "parse.tab.h"
 #include "node.h"
@@ -262,7 +261,8 @@ void SemanticAnalysis::visit_function_parameter(Node *n) {
 }
 
 void SemanticAnalysis::visit_statement_list(Node *n) {
-  enter_scope(std::format("block {}", n->get_loc().get_line()));
+
+  enter_scope("block "+ std::to_string(n->get_loc().get_line()));
   for (auto i = n->cbegin(); i != n->cend(); ++i) {
     Node *stmt = *i;
     visit(stmt);
