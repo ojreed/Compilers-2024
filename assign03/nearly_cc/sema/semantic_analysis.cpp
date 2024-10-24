@@ -53,6 +53,11 @@ void SemanticAnalysis::visit_struct_type(Node *n) {
   std::string struct_name = n->get_kid(0)->get_str();
 
   Symbol* target_struct = m_cur_symtab->lookup_recursive("struct " + struct_name);
+
+  if (target_struct == nullptr) {
+    SemanticError::raise(n->get_loc(),"Struct type not defined");
+  }
+
   type = target_struct->get_type();
 
   n->set_type(type);
@@ -128,6 +133,9 @@ void SemanticAnalysis::visit_basic_type(Node *n) {
     }
   } else if (type_spec.find("void") != type_spec.end()){
     type = std::make_shared<BasicType>(BasicTypeKind::VOID, true);
+    if (qual_spec.size() != 0) {
+      SemanticError::raise(n->get_loc(),"void cannot have extra qualifiers");
+    }
   } 
   if (qual_spec.find("const") != qual_spec.end()) {
     type = std::make_shared<QualifiedType>(type,TypeQualifier::CONST);
@@ -344,6 +352,9 @@ void SemanticAnalysis::visit_binary_expression(Node *n) {
   std::shared_ptr<Type> lhs = n->get_kid(1)->get_type();
   std::shared_ptr<Type> rhs = n->get_kid(2)->get_type();
   std::shared_ptr<Type> final_type;
+  if (lhs->is_void() || rhs->is_void()){
+    SemanticError::raise(n->get_loc(),"math on voids does not work");
+  }
   if (op == "="){
     //assignment
     test_assignment(n, lhs, rhs);
@@ -427,6 +438,9 @@ void SemanticAnalysis::visit_unary_expression(Node *n) {
   std::string op = n->get_kid(0)->get_str();
   std::shared_ptr<Type> original = n->get_kid(1)->get_type();
   if (op == "&") {
+    if (n->get_kid(1)->get_literal() || original->is_array() || original->is_function()){//error: lhs is not lvalue
+      SemanticError::raise(n->get_loc(),"LHS is not an lvalue");
+    }
     std::shared_ptr<Type> new_type(new PointerType(original));
     n->set_type(new_type);
   } else if (op == "*") {
@@ -500,6 +514,10 @@ void SemanticAnalysis::visit_field_ref_expression(Node *n) {
     struct_type = n->get_kid(0)->get_type();
   }
 
+  if (struct_type->is_pointer()) {
+    SemanticError::raise(n->get_loc(),"incorrect struct reference");
+  }
+
   std::shared_ptr<Type> member_type = struct_type->find_member(member_name)->get_type();
 
   n->set_type(member_type);
@@ -515,8 +533,14 @@ void SemanticAnalysis::visit_indirect_field_ref_expression(Node *n) {
   if (n->get_kid(0)->get_tag() == AST_VARIABLE_REF) {
     Symbol* target_struct = m_cur_symtab->lookup_recursive(struct_name);
     struct_type = target_struct->get_type()->get_base_type();
+    if (!target_struct->get_type()->is_pointer()) {
+      SemanticError::raise(n->get_loc(),"incorrect struct reference");
+    }
   } else {
     struct_type = n->get_kid(0)->get_type()->get_base_type();
+    if (!n->get_kid(0)->get_type()->is_pointer()) {
+      SemanticError::raise(n->get_loc(),"incorrect struct reference");
+    }
   }
 
   std::shared_ptr<Type> member_type = struct_type->find_member(member_name)->get_type();
