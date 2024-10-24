@@ -147,6 +147,21 @@ void SemanticAnalysis::visit_pointer_declarator(Node *n) {
   visit(n->get_kid(0));
   std::shared_ptr<Type> type(new PointerType(n->get_kid(0)->get_type()));
   n->reset_type(type);
+  if (n->get_kid(0)->get_tag() == AST_ARRAY_DECLARATOR) {
+    // If it's an array declarator, we should construct the type accordingly.
+    // The type is an array of pointers, so we first create a pointer type.
+    std::shared_ptr<Type> ptr_type(new PointerType(n->get_kid(0)->get_type()->get_base_type()));
+    
+    // Then, wrap that pointer type as an array type (i.e., array of pointers).
+    std::shared_ptr<Type> array_of_pointers(new ArrayType(ptr_type,std::stoi(n->get_kid(0)->get_kid(1)->get_str())));
+    
+    // Reset the type of this node to the array of pointers type.
+    n->reset_type(array_of_pointers);
+  } else {
+    // If it's not an array declarator, treat it as a normal pointer declarator.
+    std::shared_ptr<Type> type(new PointerType(n->get_kid(0)->get_type()));
+    n->reset_type(type);
+  }
   n->set_str(n->get_kid(0)->get_str());
 }
 
@@ -305,10 +320,12 @@ void SemanticAnalysis::visit_struct_type_definition(Node *n) {
     Node *member_decl = *i;
     
     visit(member_decl);
-    
-    std::string member_name = member_decl->get_kid(2)->get_kid(0)->get_kid(0)->get_str(); 
-    std::shared_ptr<Type> member_type = member_decl->get_kid(1)->get_type(); 
-    struct_type->add_member(Member(member_name, member_type));
+    Node *decl_list = member_decl->get_kid(2);
+    for (int i = 0; i < (int) decl_list->get_num_kids(); i++) {
+      std::string member_name = decl_list->get_kid(i)->get_kid(0)->get_str(); 
+      std::shared_ptr<Type> member_type = decl_list->get_kid(i)->get_type(); 
+      struct_type->add_member(Member(member_name, member_type));
+    }
   } 
   leave_scope();
 }
@@ -353,10 +370,11 @@ void SemanticAnalysis::visit_binary_expression(Node *n) {
     final_type = std::make_shared<BasicType>(BasicTypeKind::INT, true);
   }
   n->set_type(final_type);
+  n->set_literal();
 }
 
 void test_assignment(Node* n, std::shared_ptr<Type> lhs, std::shared_ptr<Type> rhs) {
-  if (lhs->is_array() || lhs->is_function() || (lhs->is_struct() && !lhs->is_pointer())){//error: lhs is not lvalue
+  if (n->get_kid(1)->get_literal() || lhs->is_array() || lhs->is_function() || (lhs->is_struct() && !lhs->is_pointer())){//error: lhs is not lvalue
     SemanticError::raise(n->get_loc(),"LHS is not an lvalue");
   }
   if (lhs->is_const() && !lhs->is_pointer()) { //error: assign to a const value
@@ -366,13 +384,21 @@ void test_assignment(Node* n, std::shared_ptr<Type> lhs, std::shared_ptr<Type> r
     SemanticError::raise(n->get_loc(),"Improper assignment of pointer and non-pointer");
   } 
   if (lhs->is_pointer() && rhs->is_pointer()) {//pointer assignment
-    if (!lhs->get_base_type()->get_unqualified_type()->is_same(rhs->get_base_type()->get_unqualified_type())) { //error: pointers with diff bases
+    std::shared_ptr<Type> lhs_base = lhs;
+    std::shared_ptr<Type> rhs_base = rhs;
+    while (lhs_base->is_pointer() || lhs_base->is_array()) {
+      lhs_base = lhs_base->get_base_type();
+    }
+    while (rhs_base->is_pointer() || rhs_base->is_array()) {
+      rhs_base = rhs_base->get_base_type();
+    }
+    if (!lhs_base->get_unqualified_type()->is_same(rhs_base->get_unqualified_type())) { //error: pointers with diff bases
       SemanticError::raise(n->get_loc(),"Improper assignment of non equivilant base type");
     }
-    if (!lhs->is_const() && rhs->is_const()){
+    if (!lhs_base->is_const() && rhs_base->is_const()){
       SemanticError::raise(n->get_loc(),"LHS type missing qualifier");
     }
-    if (!lhs->is_volatile() && rhs->is_volatile()){
+    if (!lhs_base->is_volatile() && rhs_base->is_volatile()){
       SemanticError::raise(n->get_loc(),"LHS type missing qualifier");
     }
   }
@@ -440,13 +466,17 @@ void SemanticAnalysis::visit_field_ref_expression(Node *n) {
   std::string struct_name = n->get_kid(0)->get_kid(0)->get_str();
   std::string member_name = n->get_kid(1)->get_str();
 
-  
-  Symbol* target_struct = m_cur_symtab->lookup_recursive(struct_name);
-  struct_type = target_struct->get_type();
+  if (n->get_kid(0)->get_tag() == AST_VARIABLE_REF) {
+    Symbol* target_struct = m_cur_symtab->lookup_recursive(struct_name);
+    struct_type = target_struct->get_type();
+  } else {
+    struct_type = n->get_kid(0)->get_type();
+  }
 
   std::shared_ptr<Type> member_type = struct_type->find_member(member_name)->get_type();
 
   n->set_type(member_type);
+  n->set_str(member_name);
 }
 
 void SemanticAnalysis::visit_indirect_field_ref_expression(Node *n) {
@@ -455,30 +485,49 @@ void SemanticAnalysis::visit_indirect_field_ref_expression(Node *n) {
   std::string struct_name = n->get_kid(0)->get_kid(0)->get_str();
   std::string member_name = n->get_kid(1)->get_str();
 
-  
-  Symbol* target_struct = m_cur_symtab->lookup_recursive(struct_name);
-  struct_type = target_struct->get_type()->get_base_type();
+  if (n->get_kid(0)->get_tag() == AST_VARIABLE_REF) {
+    Symbol* target_struct = m_cur_symtab->lookup_recursive(struct_name);
+    struct_type = target_struct->get_type()->get_base_type();
+  } else {
+    struct_type = n->get_kid(0)->get_type()->get_base_type();
+  }
 
   std::shared_ptr<Type> member_type = struct_type->find_member(member_name)->get_type();
 
   n->set_type(member_type);
+  n->set_str(member_name);
 }
 
 void SemanticAnalysis::visit_array_element_ref_expression(Node *n) {
   visit(n->get_kid(0));
-  std::string arr_name = n->get_kid(0)->get_kid(0)->get_str();
-  Symbol* arr = m_cur_symtab->lookup_recursive(arr_name);
-  if (arr == nullptr) {
-    SemanticError::raise(n->get_loc(),"Undefined array");
+  std::shared_ptr<Type> arr_type;
+  std::string arr_name;
+  if (n->get_kid(0)->get_tag() == AST_VARIABLE_REF) {
+    arr_name = n->get_kid(0)->get_kid(0)->get_str();
+    Symbol* arr = m_cur_symtab->lookup_recursive(arr_name);
+    if (arr == nullptr) {
+      SemanticError::raise(n->get_loc(),"Undefined array");
+    }
+    arr_type = arr->get_type();
+  } else {
+    arr_type = n->get_kid(0)->get_type();
+    arr_name = n->get_kid(0)->get_str();
+    
   }
-  std::shared_ptr<Type> arr_type = arr->get_type();
+
+  if (!arr_type->is_array() && !arr_type->is_pointer()){
+    SemanticError::raise(n->get_loc(),"Attempting to index a non-array");
+  }
+
   visit(n->get_kid(1)); //visit index
   std::shared_ptr<Type> index_type = n->get_kid(1)->get_type();
   if (!index_type->is_basic() || index_type->get_basic_type_kind() == BasicTypeKind::CHAR) {
     SemanticError::raise(n->get_loc(),"Improper index type");
   }
-  n->set_type(arr_type->get_base_type());
-  n->set_str(arr_name);
+
+  std::shared_ptr<Type> element_type = arr_type->get_base_type();
+  n->set_type(element_type);
+  n->set_str(arr_name);  
 }
 
 void SemanticAnalysis::visit_variable_ref(Node *n) {
@@ -497,6 +546,7 @@ void SemanticAnalysis::visit_literal_value(Node *n) {
   } else {
     n->set_type(std::make_shared<BasicType>(BasicTypeKind::CHAR, false));
   }
+  n->set_literal();
 }
 
 SymbolTable *SemanticAnalysis::enter_scope(const std::string &name) {

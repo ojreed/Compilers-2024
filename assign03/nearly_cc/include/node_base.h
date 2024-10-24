@@ -40,7 +40,7 @@
 class NodeBase : public HasOperand {
 private:
   // TODO: fields (pointer to Type, pointer to Symbol, etc.)
-
+  bool is_literal;
   // copy ctor and assignment operator not supported
   NodeBase(const NodeBase &);
   NodeBase &operator=(const NodeBase &);
@@ -57,6 +57,8 @@ public:
   bool has_symbol() const;
   Symbol* get_symbol() const;
   std::shared_ptr<Type> get_type() const;
+  void set_literal() {this->is_literal=true;};
+  bool get_literal() {return this->is_literal;}
 };
 
 #endif // NODE_BASE_H

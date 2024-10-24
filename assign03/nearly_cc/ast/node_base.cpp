@@ -24,6 +24,7 @@
 NodeBase::NodeBase()
   // TODO: initialize member variables (e.g., pointer to Symbol)
 {
+  this->is_literal = false;
 }
 
 NodeBase::~NodeBase() {
