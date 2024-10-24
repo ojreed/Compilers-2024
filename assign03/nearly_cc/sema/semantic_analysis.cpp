@@ -209,10 +209,17 @@ void SemanticAnalysis::visit_function_declaration(Node *n) {
   visit_function_parameter_list(param_list);
   
   //define function type
+  std::set<std::string> string_set;
   std::shared_ptr<Type> type(new FunctionType(base_type));
   for (auto i = param_list->cbegin(); i != param_list->cend(); ++i) {
     Node *parameter = *i;
-    type->add_member(Member(parameter->get_kid(1)->get_kid(0)->get_str(),parameter->get_type()));
+    std::string param_name = parameter->get_kid(1)->get_kid(0)->get_str();
+    if (string_set.find(param_name) != string_set.end()) {
+      SemanticError::raise(n->get_loc(),"Cannot have two parameters with the same name");
+    }
+    string_set.insert(param_name);
+
+    type->add_member(Member(param_name,parameter->get_type()));
   }
   
   //store fn information
@@ -298,7 +305,7 @@ void SemanticAnalysis::visit_return_expression_statement(Node *n) {
   std::shared_ptr<Type> return_type = m_cur_symtab->get_fn_type()->get_base_type();
   visit(n->get_kid(0)); 
   std::shared_ptr<Type> returned_type = n->get_kid(0)->get_type();
-  if (!is_same_type(return_type,returned_type)){
+  if (return_type->as_str() != returned_type->as_str()){
     SemanticError::raise(n->get_loc(),"Invalid type of returned value");
   }
   n->set_type(return_type);
@@ -367,6 +374,12 @@ void SemanticAnalysis::visit_binary_expression(Node *n) {
       SemanticError::raise(n->get_loc(),"Invalid double pointer arithmatic");
     }
   } else {
+    if (lhs->is_function() || lhs->is_struct() || lhs->is_array()) {
+      SemanticError::raise(n->get_loc(),"Attempting to compare a non-numeric object");
+    }
+    if (rhs->is_function() || rhs->is_struct() || rhs->is_array()) {
+      SemanticError::raise(n->get_loc(),"Attempting to compare a non-numeric object");
+    }
     final_type = std::make_shared<BasicType>(BasicTypeKind::INT, true);
   }
   n->set_type(final_type);
@@ -383,15 +396,16 @@ void test_assignment(Node* n, std::shared_ptr<Type> lhs, std::shared_ptr<Type> r
   if (!lhs->is_pointer() && rhs->is_pointer()) { //error: pointer and non-pointer assignment
     SemanticError::raise(n->get_loc(),"Improper assignment of pointer and non-pointer");
   } 
+  std::shared_ptr<Type> lhs_base = lhs;
+  std::shared_ptr<Type> rhs_base = rhs;
+  while (lhs_base->is_pointer() || lhs_base->is_array()) {
+    lhs_base = lhs_base->get_base_type();
+  }
+  while (rhs_base->is_pointer() || rhs_base->is_array()) {
+    rhs_base = rhs_base->get_base_type();
+  }
   if (lhs->is_pointer() && rhs->is_pointer()) {//pointer assignment
-    std::shared_ptr<Type> lhs_base = lhs;
-    std::shared_ptr<Type> rhs_base = rhs;
-    while (lhs_base->is_pointer() || lhs_base->is_array()) {
-      lhs_base = lhs_base->get_base_type();
-    }
-    while (rhs_base->is_pointer() || rhs_base->is_array()) {
-      rhs_base = rhs_base->get_base_type();
-    }
+    
     if (!lhs_base->get_unqualified_type()->is_same(rhs_base->get_unqualified_type())) { //error: pointers with diff bases
       SemanticError::raise(n->get_loc(),"Improper assignment of non equivilant base type");
     }
@@ -400,6 +414,10 @@ void test_assignment(Node* n, std::shared_ptr<Type> lhs, std::shared_ptr<Type> r
     }
     if (!lhs_base->is_volatile() && rhs_base->is_volatile()){
       SemanticError::raise(n->get_loc(),"LHS type missing qualifier");
+    }
+  } else {
+    if (lhs->is_struct() != rhs->is_struct()) {
+      SemanticError::raise(n->get_loc(),"Invalid LHS and RHS types");
     }
   }
 }
@@ -418,7 +436,16 @@ void SemanticAnalysis::visit_unary_expression(Node *n) {
     n->set_type(original->get_base_type());
   } else if (op == "!") {
     n->set_type(original);
+    if (original->is_function() || original->is_struct() || original->is_array()) {
+      SemanticError::raise(n->get_loc(),"Attempting to not a non-numeric object");
+    }
+    if (original->get_basic_type_kind() == BasicTypeKind::CHAR) {
+      SemanticError::raise(n->get_loc(),"Attempting to not a character");
+    }
   } else if (op == "-") {
+    if (original->is_function() || original->is_struct() || original->is_array()) {
+      SemanticError::raise(n->get_loc(),"Attempting to negate a non-numeric object");
+    }
     if (original->get_basic_type_kind() == BasicTypeKind::CHAR) {
       SemanticError::raise(n->get_loc(),"Attempting to negate a character");
     }
