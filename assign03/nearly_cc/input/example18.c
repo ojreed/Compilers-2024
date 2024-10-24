@@ -3,6 +3,7 @@ struct Foo {
   char y;
 };
 
+
 int readint(void);
 
 int main(void) {

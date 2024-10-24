@@ -9,9 +9,5 @@ int main(void) {
 
   pp[0][0] = 17; // this should be allowed, and will assign to x
 
-
-
   return 0;
 }
-
-

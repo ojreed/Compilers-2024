@@ -1,8 +1,6 @@
 int sum(int arr[0], int n);
 
 int main(void) {
-  int x;
-  x = 1;
   int a[5];
   a[0] = 1;
   a[1] = 2;
@@ -10,6 +8,6 @@ int main(void) {
   a[3] = 4;
   a[4] = 5;
   int tot;
-  tot = sum(a[0], 5);
+  tot = sum(a, 5);
   return tot;
 }

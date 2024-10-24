@@ -49,7 +49,13 @@ SemanticAnalysis::~SemanticAnalysis() {
 }
 
 void SemanticAnalysis::visit_struct_type(Node *n) {
-  // TODO: implement
+  std::shared_ptr<Type> type; 
+  std::string struct_name = n->get_kid(0)->get_str();
+
+  Symbol* target_struct = m_cur_symtab->lookup_recursive("struct " + struct_name);
+  type = target_struct->get_type();
+
+  n->set_type(type);
 }
 
 void SemanticAnalysis::visit_union_type(Node *n) {
@@ -60,19 +66,14 @@ void SemanticAnalysis::visit_variable_declaration(Node *n) {
   // visit the base type
   visit(n->get_kid(1));
   std::shared_ptr<Type> base_type = n->get_kid(1)->get_type();
+  n->set_type(base_type);
   // iterate through declarators, adding variables
   // to the symbol table
   Node *decl_list = n->get_kid(2);
   for (auto i = decl_list->cbegin(); i != decl_list->cend(); ++i) {
     Node *declarator = *i;
     declarator->set_type(base_type);
-    if (declarator->get_tag() == AST_NAMED_DECLARATOR) {
-      visit_named_declarator(declarator);
-    } else if (declarator->get_tag() == AST_ARRAY_DECLARATOR) {
-      visit_array_declarator(declarator);
-    } else if (declarator->get_tag() == AST_POINTER_DECLARATOR) {
-      visit_pointer_declarator(declarator);
-    }
+    visit(declarator);
     m_cur_symtab->add_entry(n->get_loc(),SymbolKind::VARIABLE,declarator->get_str(),declarator->get_type());
   }
 }
@@ -92,11 +93,19 @@ void SemanticAnalysis::visit_basic_type(Node *n) {
       }
     }
   }
+  if (type_spec.size()==0 && qual_spec.size()>0){
+    type_spec.insert("int");
+  }
   if (type_spec.size()!=1){
     SemanticError::raise(n->get_loc(), "Improper combination of type specifications");
   }
   if (type_spec.find("char") != type_spec.end()){
-    type = std::make_shared<BasicType>(BasicTypeKind::CHAR, false);
+    if (qual_spec.find("unsigned") != qual_spec.end()) {
+      type = std::make_shared<BasicType>(BasicTypeKind::CHAR, false);
+    } else {
+      type = std::make_shared<BasicType>(BasicTypeKind::CHAR, true);
+    }
+    
   } else if (type_spec.find("int") != type_spec.end()){
     if (qual_spec.find("long") != qual_spec.end()){ //long int
       if (qual_spec.find("unsigned") != qual_spec.end()) {
@@ -281,7 +290,27 @@ void SemanticAnalysis::visit_return_expression_statement(Node *n) {
 }
 
 void SemanticAnalysis::visit_struct_type_definition(Node *n) {
-  // TODO: implement
+  std::string name = n->get_kid(0)->get_str();
+  Location loc = n->get_loc();
+  std::shared_ptr<Type> struct_type(new StructType(name));
+
+  m_cur_symtab->add_entry(loc,
+                          SymbolKind::TYPE,
+                          "struct " + name,
+                          struct_type);
+
+  Node *body = n->get_kid(1);
+  enter_scope("struct " + name);
+  for (auto i = body->cbegin(); i != body->cend(); ++i) {
+    Node *member_decl = *i;
+    
+    visit(member_decl);
+    
+    std::string member_name = member_decl->get_kid(2)->get_kid(0)->get_kid(0)->get_str(); 
+    std::shared_ptr<Type> member_type = member_decl->get_kid(1)->get_type(); 
+    struct_type->add_member(Member(member_name, member_type));
+  } 
+  leave_scope();
 }
 
 void SemanticAnalysis::visit_binary_expression(Node *n) {
@@ -376,7 +405,7 @@ void SemanticAnalysis::visit_postfix_expression(Node *n) {
 }
 
 void SemanticAnalysis::visit_conditional_expression(Node *n) {
-
+  // TODO: implement
 }
 
 void SemanticAnalysis::visit_cast_expression(Node *n) {
@@ -406,11 +435,33 @@ void SemanticAnalysis::visit_function_call_expression(Node *n) {
 }
 
 void SemanticAnalysis::visit_field_ref_expression(Node *n) {
-  // TODO: implement
+  std::shared_ptr<Type> struct_type; 
+  visit(n->get_kid(0));
+  std::string struct_name = n->get_kid(0)->get_kid(0)->get_str();
+  std::string member_name = n->get_kid(1)->get_str();
+
+  
+  Symbol* target_struct = m_cur_symtab->lookup_recursive(struct_name);
+  struct_type = target_struct->get_type();
+
+  std::shared_ptr<Type> member_type = struct_type->find_member(member_name)->get_type();
+
+  n->set_type(member_type);
 }
 
 void SemanticAnalysis::visit_indirect_field_ref_expression(Node *n) {
-  // TODO: implement
+  std::shared_ptr<Type> struct_type; 
+  visit(n->get_kid(0));
+  std::string struct_name = n->get_kid(0)->get_kid(0)->get_str();
+  std::string member_name = n->get_kid(1)->get_str();
+
+  
+  Symbol* target_struct = m_cur_symtab->lookup_recursive(struct_name);
+  struct_type = target_struct->get_type()->get_base_type();
+
+  std::shared_ptr<Type> member_type = struct_type->find_member(member_name)->get_type();
+
+  n->set_type(member_type);
 }
 
 void SemanticAnalysis::visit_array_element_ref_expression(Node *n) {
