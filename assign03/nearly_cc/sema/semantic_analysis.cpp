@@ -241,7 +241,11 @@ void SemanticAnalysis::visit_function_declaration(Node *n) {
   }
 }
 
+/*
+iterates over all parameters to be included in a function, processes stores and error checks
+*/
 void SemanticAnalysis::visit_function_parameter_list(Node *n) {
+  //setup
   bool first_time = (m_cur_symtab->get_num_entries() == 0);
   int num_parameters = 0;
   if (!first_time) {
@@ -251,11 +255,13 @@ void SemanticAnalysis::visit_function_parameter_list(Node *n) {
     SemanticError::raise(n->get_loc(), "Mismatch of number of parameters in redeclaration of funuction");
   }
 
+  //iterate
   for (auto i = n->cbegin(); i != n->cend(); ++i) {
     //setup
     Node *parameter = *i;
     int index = std::distance(n->cbegin(), i);
 
+    //switch here controls if this is a function redefinition
     if (first_time){
       //basic computation
       visit_function_parameter(parameter);
@@ -276,22 +282,26 @@ void SemanticAnalysis::visit_function_parameter_list(Node *n) {
   } 
 }
 
+
+/*
+looks at input parameter of a function
+*/
 void SemanticAnalysis::visit_function_parameter(Node *n) {
   // visit the base type
   visit(n->get_kid(0));
   std::shared_ptr<Type> base_type = n->get_kid(0)->get_type();
   Node* declarator = n->get_kid(1);
   declarator->set_type(base_type);
-  if (declarator->get_tag() == AST_NAMED_DECLARATOR) {
+  if (declarator->get_tag() == AST_NAMED_DECLARATOR) {//basic parameters
     visit_named_declarator(declarator);
     n->set_type(declarator->get_type());
     m_cur_symtab->add_entry(n->get_loc(),SymbolKind::VARIABLE,declarator->get_str(),declarator->get_type());
-  } else if (declarator->get_tag() == AST_ARRAY_DECLARATOR) {
+  } else if (declarator->get_tag() == AST_ARRAY_DECLARATOR) {//arrays cast to funky pointers
     std::shared_ptr<Type> type(new PointerType(declarator->get_type()));
     declarator->reset_type(type);
     m_cur_symtab->add_entry(n->get_loc(),SymbolKind::VARIABLE,declarator->get_kid(0)->get_kid(0)->get_str(),declarator->get_type());
     n->set_type(type);
-  } else if (declarator->get_tag() == AST_POINTER_DECLARATOR) {
+  } else if (declarator->get_tag() == AST_POINTER_DECLARATOR) {//pointers
     visit_pointer_declarator(declarator);
     n->set_type(declarator->get_type());
     m_cur_symtab->add_entry(n->get_loc(),SymbolKind::VARIABLE,declarator->get_str(),declarator->get_type());
@@ -299,6 +309,10 @@ void SemanticAnalysis::visit_function_parameter(Node *n) {
   
 }
 
+
+/*
+iterates over a list of statements in a block scope
+*/
 void SemanticAnalysis::visit_statement_list(Node *n) {
 
   enter_scope("block "+ std::to_string(n->get_loc().get_line()));
@@ -309,34 +323,43 @@ void SemanticAnalysis::visit_statement_list(Node *n) {
   leave_scope();
 }
 
+/*
+error check on return statments
+*/
 void SemanticAnalysis::visit_return_expression_statement(Node *n) {
-  std::shared_ptr<Type> return_type = m_cur_symtab->get_fn_type()->get_base_type();
+  std::shared_ptr<Type> return_type = m_cur_symtab->get_fn_type()->get_base_type();//type we aim to return
   visit(n->get_kid(0)); 
-  std::shared_ptr<Type> returned_type = n->get_kid(0)->get_type();
+  std::shared_ptr<Type> returned_type = n->get_kid(0)->get_type(); //type we actually returned 
   if (return_type->as_str() != returned_type->as_str()){
     SemanticError::raise(n->get_loc(),"Invalid type of returned value");
   }
   n->set_type(return_type);
 }
 
+/*
+setups a struct type
+*/
 void SemanticAnalysis::visit_struct_type_definition(Node *n) {
+  //setup
   std::string name = n->get_kid(0)->get_str();
   Location loc = n->get_loc();
   std::shared_ptr<Type> struct_type(new StructType(name));
 
+  //create type
   m_cur_symtab->add_entry(loc,
                           SymbolKind::TYPE,
                           "struct " + name,
                           struct_type);
 
+  //fill in body
   Node *body = n->get_kid(1);
   enter_scope("struct " + name);
   for (auto i = body->cbegin(); i != body->cend(); ++i) {
     Node *member_decl = *i;
     
-    visit(member_decl);
+    visit(member_decl);//process body
     Node *decl_list = member_decl->get_kid(2);
-    for (int i = 0; i < (int) decl_list->get_num_kids(); i++) {
+    for (int i = 0; i < (int) decl_list->get_num_kids(); i++) {//store body as members
       std::string member_name = decl_list->get_kid(i)->get_kid(0)->get_str(); 
       std::shared_ptr<Type> member_type = decl_list->get_kid(i)->get_type(); 
       struct_type->add_member(Member(member_name, member_type));
@@ -345,6 +368,9 @@ void SemanticAnalysis::visit_struct_type_definition(Node *n) {
   leave_scope();
 }
 
+/*
+manages all binary ops from math to assignment to logic
+*/
 void SemanticAnalysis::visit_binary_expression(Node *n) {
   std::string op = n->get_kid(0)->get_str();
   visit(n->get_kid(1));
@@ -384,20 +410,25 @@ void SemanticAnalysis::visit_binary_expression(Node *n) {
     } else {
       SemanticError::raise(n->get_loc(),"Invalid double pointer arithmatic");
     }
-  } else {
+  } else { //logical comparisons
     if (lhs->is_function() || lhs->is_struct() || lhs->is_array()) {
       SemanticError::raise(n->get_loc(),"Attempting to compare a non-numeric object");
     }
     if (rhs->is_function() || rhs->is_struct() || rhs->is_array()) {
       SemanticError::raise(n->get_loc(),"Attempting to compare a non-numeric object");
     }
-    final_type = std::make_shared<BasicType>(BasicTypeKind::INT, true);
+    final_type = std::make_shared<BasicType>(BasicTypeKind::INT, true); //if not bad --> return an int
   }
   n->set_type(final_type);
   n->set_literal();
 }
 
+
+/*
+tests assignment of rhs to lhs and throws errors if problematic
+*/
 void test_assignment(Node* n, std::shared_ptr<Type> lhs, std::shared_ptr<Type> rhs) {
+  //generic errors
   if (n->get_kid(1)->get_literal() || lhs->is_array() || lhs->is_function() || (lhs->is_struct() && !lhs->is_pointer())){//error: lhs is not lvalue
     SemanticError::raise(n->get_loc(),"LHS is not an lvalue");
   }
@@ -407,6 +438,7 @@ void test_assignment(Node* n, std::shared_ptr<Type> lhs, std::shared_ptr<Type> r
   if (!lhs->is_pointer() && rhs->is_pointer()) { //error: pointer and non-pointer assignment
     SemanticError::raise(n->get_loc(),"Improper assignment of pointer and non-pointer");
   } 
+  //compute base versions of lhs and rhs for testing
   std::shared_ptr<Type> lhs_base = lhs;
   std::shared_ptr<Type> rhs_base = rhs;
   while (lhs_base->is_pointer() || lhs_base->is_array()) {
@@ -426,29 +458,32 @@ void test_assignment(Node* n, std::shared_ptr<Type> lhs, std::shared_ptr<Type> r
     if (!lhs_base->is_volatile() && rhs_base->is_volatile()){
       SemanticError::raise(n->get_loc(),"LHS type missing qualifier");
     }
-  } else {
+  } else { //literal literal errors
     if (lhs->is_struct() != rhs->is_struct()) {
       SemanticError::raise(n->get_loc(),"Invalid LHS and RHS types");
     }
   }
 }
 
+/*
+handels all unary ops
+*/
 void SemanticAnalysis::visit_unary_expression(Node *n) {
   visit(n->get_kid(1));
   std::string op = n->get_kid(0)->get_str();
   std::shared_ptr<Type> original = n->get_kid(1)->get_type();
-  if (op == "&") {
+  if (op == "&") {//address of computation
     if (n->get_kid(1)->get_literal() || original->is_array() || original->is_function()){//error: lhs is not lvalue
       SemanticError::raise(n->get_loc(),"LHS is not an lvalue");
     }
     std::shared_ptr<Type> new_type(new PointerType(original));
     n->set_type(new_type);
-  } else if (op == "*") {
+  } else if (op == "*") {//dereference
     if (!original->is_pointer()) {
       SemanticError::raise(n->get_loc(),"Attempting to dereference non-pointer");
     }
     n->set_type(original->get_base_type());
-  } else if (op == "!") {
+  } else if (op == "!") {//not
     n->set_type(original);
     if (original->is_function() || original->is_struct() || original->is_array()) {
       SemanticError::raise(n->get_loc(),"Attempting to not a non-numeric object");
@@ -456,7 +491,7 @@ void SemanticAnalysis::visit_unary_expression(Node *n) {
     if (original->get_basic_type_kind() == BasicTypeKind::CHAR) {
       SemanticError::raise(n->get_loc(),"Attempting to not a character");
     }
-  } else if (op == "-") {
+  } else if (op == "-") {//negate
     if (original->is_function() || original->is_struct() || original->is_array()) {
       SemanticError::raise(n->get_loc(),"Attempting to negate a non-numeric object");
     }
@@ -467,19 +502,34 @@ void SemanticAnalysis::visit_unary_expression(Node *n) {
   }
 }
 
+
+/*
+not used in tests
+*/
 void SemanticAnalysis::visit_postfix_expression(Node *n) {
-  // TODO: implement
+
 }
 
+/*
+not used in tests
+*/
 void SemanticAnalysis::visit_conditional_expression(Node *n) {
-  // TODO: implement
+
 }
 
+/*
+not used in tests
+*/
 void SemanticAnalysis::visit_cast_expression(Node *n) {
-  // TODO: implement
+
 }
 
+
+/*
+processes function call
+*/
 void SemanticAnalysis::visit_function_call_expression(Node *n) {
+  //setup
   std::string fn_name = n->get_kid(0)->get_kid(0)->get_str();
   Symbol* function = m_cur_symtab->lookup_recursive(fn_name);
   if (function == nullptr) {
@@ -487,11 +537,15 @@ void SemanticAnalysis::visit_function_call_expression(Node *n) {
   }
   std::shared_ptr<Type> fn_type = function->get_type();
   std::shared_ptr<Type> return_type = fn_type->get_base_type();
+  
+  //process function arguments
   visit(n->get_kid(1));
   Node *arg_list = n->get_kid(1);
   if (fn_type->get_num_members() != arg_list->get_num_kids()) {
     SemanticError::raise(n->get_loc(),"Improper number of arguments");
   }
+
+  //check that all function args are of proper type
   for (auto i = arg_list->cbegin(); i != arg_list->cend(); ++i) {
     //setup
     Node *argument = *i;
@@ -501,12 +555,17 @@ void SemanticAnalysis::visit_function_call_expression(Node *n) {
   n->set_type(return_type);
 }
 
+/*
+look at member of a struct that isnt a pointer
+*/
 void SemanticAnalysis::visit_field_ref_expression(Node *n) {
+  //setup
   std::shared_ptr<Type> struct_type; 
   visit(n->get_kid(0));
   std::string struct_name = n->get_kid(0)->get_kid(0)->get_str();
   std::string member_name = n->get_kid(1)->get_str();
 
+  //bc/rc for chains of referencing 
   if (n->get_kid(0)->get_tag() == AST_VARIABLE_REF) {
     Symbol* target_struct = m_cur_symtab->lookup_recursive(struct_name);
     struct_type = target_struct->get_type();
@@ -520,23 +579,30 @@ void SemanticAnalysis::visit_field_ref_expression(Node *n) {
 
   std::shared_ptr<Type> member_type = struct_type->find_member(member_name)->get_type();
 
+  //cleanup
   n->set_type(member_type);
   n->set_str(member_name);
 }
 
+/*
+look at a struct member from a struct stored as a pointer
+*/
 void SemanticAnalysis::visit_indirect_field_ref_expression(Node *n) {
+  //setup
   std::shared_ptr<Type> struct_type; 
   visit(n->get_kid(0));
   std::string struct_name = n->get_kid(0)->get_kid(0)->get_str();
   std::string member_name = n->get_kid(1)->get_str();
 
+  //controls if we are in base case struct or recursive case
   if (n->get_kid(0)->get_tag() == AST_VARIABLE_REF) {
+    //bc involves looking up ds
     Symbol* target_struct = m_cur_symtab->lookup_recursive(struct_name);
     struct_type = target_struct->get_type()->get_base_type();
     if (!target_struct->get_type()->is_pointer()) {
       SemanticError::raise(n->get_loc(),"incorrect struct reference");
     }
-  } else {
+  } else { //rc uses pre-computed types
     struct_type = n->get_kid(0)->get_type()->get_base_type();
     if (!n->get_kid(0)->get_type()->is_pointer()) {
       SemanticError::raise(n->get_loc(),"incorrect struct reference");
@@ -549,24 +615,30 @@ void SemanticAnalysis::visit_indirect_field_ref_expression(Node *n) {
   n->set_str(member_name);
 }
 
+/*
+takes an array and processes the type of a single index
+*/
 void SemanticAnalysis::visit_array_element_ref_expression(Node *n) {
+  //setup info
   visit(n->get_kid(0));
   std::shared_ptr<Type> arr_type;
   std::string arr_name;
+  
+  //if controls weather we are in a base case or if this is going to be part of a longer chain of dereferencing 
   if (n->get_kid(0)->get_tag() == AST_VARIABLE_REF) {
     arr_name = n->get_kid(0)->get_kid(0)->get_str();
-    Symbol* arr = m_cur_symtab->lookup_recursive(arr_name);
+    Symbol* arr = m_cur_symtab->lookup_recursive(arr_name); //basecase looks up the original ds
     if (arr == nullptr) {
       SemanticError::raise(n->get_loc(),"Undefined array");
     }
     arr_type = arr->get_type();
-  } else {
+  } else { //recursive case uses pre-computed types
     arr_type = n->get_kid(0)->get_type();
     arr_name = n->get_kid(0)->get_str();
     
   }
 
-  if (!arr_type->is_array() && !arr_type->is_pointer()){
+  if (!arr_type->is_array() && !arr_type->is_pointer()){//we dont have an array
     SemanticError::raise(n->get_loc(),"Attempting to index a non-array");
   }
 
@@ -576,11 +648,15 @@ void SemanticAnalysis::visit_array_element_ref_expression(Node *n) {
     SemanticError::raise(n->get_loc(),"Improper index type");
   }
 
+  //cleanup
   std::shared_ptr<Type> element_type = arr_type->get_base_type();
   n->set_type(element_type);
   n->set_str(arr_name);  
 }
 
+/*
+looksup type for a variable in the symbol table
+*/
 void SemanticAnalysis::visit_variable_ref(Node *n) {
   std::string target_name = n->get_kid(0)->get_str();
   Symbol* var_symbol = m_cur_symtab->lookup_recursive(target_name);
@@ -591,11 +667,14 @@ void SemanticAnalysis::visit_variable_ref(Node *n) {
   n->set_str(target_name);
 }
 
+/*
+sets up typing information for literal values
+*/
 void SemanticAnalysis::visit_literal_value(Node *n) {
   if (n->get_kid(0)->get_tag() == TOK_INT_LIT) {
     n->set_type(std::make_shared<BasicType>(BasicTypeKind::INT, true));
   } else {
-    n->set_type(std::make_shared<BasicType>(BasicTypeKind::CHAR, false));
+    n->set_type(std::make_shared<BasicType>(BasicTypeKind::CHAR, true));
   }
   n->set_literal();
 }
@@ -620,21 +699,4 @@ SymbolTable* SemanticAnalysis::find_symbol_table_by_name(const std::string& name
       }
   }
   return nullptr; // Return nullptr if no match is found
-}
-
-//family of functions for lazy type comp
-bool is_same_type(Symbol* a, Symbol* b) {
-  return (a->get_type()->get_basic_type_kind() == b->get_type()->get_basic_type_kind());
-}
-
-bool is_same_type(std::shared_ptr<Type> a, std::shared_ptr<Type> b) {
-  return (a->get_basic_type_kind() == b->get_basic_type_kind());
-}
-
-bool is_same_type(Symbol* a, std::shared_ptr<Type> b) {
-  return (a->get_type()->get_basic_type_kind() == b->get_basic_type_kind());
-}
-
-bool is_same_type(std::shared_ptr<Type> a, Symbol* b) {
-  return (a->get_basic_type_kind() == b->get_type()->get_basic_type_kind());
 }
