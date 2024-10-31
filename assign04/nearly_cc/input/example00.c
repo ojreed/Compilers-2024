@@ -1,0 +1,1 @@
+const volatile int x, y[10], *z;
