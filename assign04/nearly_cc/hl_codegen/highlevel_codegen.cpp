@@ -64,6 +64,7 @@ void HighLevelCodegen::generate(std::shared_ptr<Function> function) {
 }
 
 void HighLevelCodegen::visit_function_definition(Node *n) {
+  //TODO: SCOPE?????
   // generate the name of the label that return instructions should target
   std::string fn_name = n->get_kid(1)->get_str();
   m_return_label_name = ".L" + fn_name + "_return";
@@ -84,7 +85,7 @@ void HighLevelCodegen::visit_function_definition(Node *n) {
 }
 
 void HighLevelCodegen::visit_statement_list(Node *n) {
-  // TODO: implement
+  //TODO: SCOPE????
   for (auto i = n->cbegin(); i != n->cend(); ++i) {
     //setup
     Node *stmt = *i;
@@ -327,14 +328,13 @@ void HighLevelCodegen::visit_unary_expression(Node *n) {
     get_hl_iseq()->append(new Instruction(opcode, v_temp, reg));
 
     n->set_operand(v_temp);
-  } else { //pointer computations
+  } else { //TODO: pointer computations
 
   }
 
 }
 
 void HighLevelCodegen::visit_function_call_expression(Node *n) {
-  // TODO: implement
   std::string fn_name = n->get_kid(0)->get_kid(0)->get_str();
   Node* arg_list = n->get_kid(1);
   visit(arg_list);
@@ -359,19 +359,102 @@ void HighLevelCodegen::visit_function_call_expression(Node *n) {
 }
 
 void HighLevelCodegen::visit_field_ref_expression(Node *n) {
-  // TODO: implement
+  Node* ident = n->get_kid(0);
+  visit(ident);
+  int struct_mem = ident->get_operand().get_base_reg();
+  Symbol* struct_sym = ident->get_symbol();
+
+  //get member offset
+  Node* member = n->get_kid(1);
+  std::string member_name = member->get_str();
+  int member_offset = struct_sym->get_type()->get_field_offset(member_name);
+
+  //Store Struct Address in VReg
+  int i_addr = m_function->get_vra()->alloc_local();
+  Operand addr = Operand(Operand::VREG, i_addr);
+  LiteralValue arr_mem_val = LiteralValue(struct_mem,false,false);
+  get_hl_iseq()->append(new Instruction(HINS_localaddr, addr, Operand(Operand::IMM_IVAL, arr_mem_val.get_int_value())));
+
+  //Store member offset Address in VReg
+  int i_offset = m_function->get_vra()->alloc_local();
+  Operand offset_reg = Operand(Operand::VREG, i_offset);
+  LiteralValue offset_mem_val = LiteralValue(member_offset,false,false);
+  get_hl_iseq()->append(new Instruction(HINS_mov_q, offset_reg, Operand(Operand::IMM_IVAL, offset_mem_val.get_int_value())));
+
+  //Add offset to Struct
+  int i_new_addr = m_function->get_vra()->alloc_local();
+  Operand new_addr = Operand(Operand::VREG, i_new_addr);
+  get_hl_iseq()->append(new Instruction(HINS_add_q, new_addr, offset_reg, addr));
+
+  //Pass up (Struct+Offset)
+  n->set_operand(Operand(Operand::VREG_MEM, new_addr.get_base_reg()));
 }
 
 void HighLevelCodegen::visit_indirect_field_ref_expression(Node *n) {
-  // TODO: implement
+  Node* ident = n->get_kid(0);
+  visit(ident);
+  int struct_mem = ident->get_operand().get_base_reg();
+;
+
+  //get member offset
+  Node* member = n->get_kid(1);
+  std::string member_name = member->get_str();
+  int member_offset = ident->get_symbol()->get_type()->get_base_type()->get_field_offset(member_name);
+
+  //Store Struct Address in VReg
+  int i_addr = m_function->get_vra()->alloc_local();
+  Operand addr = Operand(Operand::VREG, i_addr);
+  LiteralValue arr_mem_val = LiteralValue(struct_mem,false,false);
+  get_hl_iseq()->append(new Instruction(HINS_mov_q, addr, Operand(Operand::IMM_IVAL, arr_mem_val.get_int_value())));
+
+  //Store member offset Address in VReg
+  int i_offset = m_function->get_vra()->alloc_local();
+  Operand offset_reg = Operand(Operand::VREG, i_offset);
+  LiteralValue offset_mem_val = LiteralValue(member_offset,false,false);
+  get_hl_iseq()->append(new Instruction(HINS_mov_q, offset_reg, Operand(Operand::IMM_IVAL, offset_mem_val.get_int_value())));
+
+  //Add offset to Struct
+  int i_new_addr = m_function->get_vra()->alloc_local();
+  Operand new_addr = Operand(Operand::VREG, i_new_addr);
+  get_hl_iseq()->append(new Instruction(HINS_add_q, new_addr, offset_reg, addr));
+
+  //Pass up (Struct+Offset)
+  n->set_operand(Operand(Operand::VREG_MEM, new_addr.get_base_reg()));
 }
 
 void HighLevelCodegen::visit_array_element_ref_expression(Node *n) {
-  // TODO: implement
+  Node* arr = n->get_kid(0);
+  visit(arr);
+  int arr_mem = arr->get_operand().get_base_reg();
+  std::shared_ptr<Type> arr_type = arr->get_symbol()->get_type()->get_base_type();
+  int value_size = arr_type->get_storage_size();
+
+  Node* index = n->get_kid(1);
+  visit(index);
+  Operand index_reg = index->get_operand();
+
+  //Store Array Address in VReg
+  int i_addr = m_function->get_vra()->alloc_local();
+  Operand addr = Operand(Operand::VREG, i_addr);
+  LiteralValue arr_mem_val = LiteralValue(arr_mem,false,false);
+  get_hl_iseq()->append(new Instruction(HINS_localaddr, addr, Operand(Operand::IMM_IVAL, arr_mem_val.get_int_value())));
+
+  //Compute offset = index*size
+  int i_IxS = m_function->get_vra()->alloc_local();
+  Operand IxS = Operand(Operand::VREG, i_IxS);
+  LiteralValue l_size = LiteralValue(value_size,false,false);
+  get_hl_iseq()->append(new Instruction(HINS_mul_q, IxS, index_reg, Operand(Operand::IMM_IVAL, l_size.get_int_value())));
+
+  //Add offset to Array
+  int i_new_addr = m_function->get_vra()->alloc_local();
+  Operand new_addr = Operand(Operand::VREG, i_new_addr);
+  get_hl_iseq()->append(new Instruction(HINS_add_q, new_addr, IxS, addr));
+
+  //Pass up (Array+Offset)
+  n->set_operand(Operand(Operand::VREG_MEM, new_addr.get_base_reg()));
 }
 
 void HighLevelCodegen::visit_variable_ref(Node *n) {
-  // TODO: implement
   Symbol* s = n->get_symbol();
   if (s->get_reg() != -1) {
     n->set_operand(Operand(Operand::VREG, s->get_reg()));
@@ -385,16 +468,17 @@ void HighLevelCodegen::visit_variable_ref(Node *n) {
 void HighLevelCodegen::visit_literal_value(Node *n) {
   // A partial implementation (note that this won't work correctly
   // for string constants!):
-  LiteralValue val;
-  if (n->get_type()->get_basic_type_kind() == BasicTypeKind::INT) {
-    val = LiteralValue(std::stoi(n->get_kid(0)->get_str()),false,false);
-  } else { // is char
-    val = LiteralValue(n->get_kid(0)->get_str());
-  }
   int vreg = m_function->get_vra()->alloc_local();
   Operand dest(Operand::VREG, vreg);
   HighLevelOpcode mov_opcode = get_opcode(HINS_mov_b, n->get_type());
-  get_hl_iseq()->append(new Instruction(mov_opcode, dest, Operand(Operand::IMM_IVAL, val.get_int_value())));
+  LiteralValue val;
+  if (n->get_type()->get_basic_type_kind() == BasicTypeKind::INT) {
+    val = LiteralValue(std::stoi(n->get_kid(0)->get_str()),false,false);
+    get_hl_iseq()->append(new Instruction(mov_opcode, dest, Operand(Operand::IMM_IVAL, val.get_int_value())));
+  } else { //TODO: fix char
+    std::string lit_str = n->get_kid(0)->get_str();
+    get_hl_iseq()->append(new Instruction(mov_opcode, dest, Operand(Operand::IMM_LABEL, val.get_char_value())));
+  }
   n->set_operand(dest);
 }
 

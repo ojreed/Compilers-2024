@@ -55,8 +55,7 @@ void LocalStorageAllocation::visit_function_definition(Node *n) {
     }
     if (s->get_type()->is_array() || s->get_type()->is_struct()){ //needs mem_alloc
       //TODO: OR ITS ADDRESS IS TAKEN???
-      m_storage_calc.add_field(s->get_type());
-      s->set_al(m_storage_calc.get_align()); 
+      s->set_al(m_storage_calc.add_field(s->get_type())); 
     } else { //can be stored in register
       s->set_reg(m_function->get_vra()->alloc_local());
     }
