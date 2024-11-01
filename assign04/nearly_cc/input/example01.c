@@ -1,10 +1,6 @@
-struct Foo {
-  int x;
-  int y;
-};
-
 int main(void) {
-  struct Foo* f;
-  f->y = 1;
-  return 0;
+  int a, *p;
+  p = &a;
+  *p = 42;
+  return a; // should return 42
 }

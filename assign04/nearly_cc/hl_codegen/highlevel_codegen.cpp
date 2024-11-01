@@ -323,13 +323,15 @@ void HighLevelCodegen::visit_unary_expression(Node *n) {
     //setup temp destintation
     int i_v_temp = m_function->get_vra()->alloc_local();
     Operand v_temp = Operand(Operand::VREG, i_v_temp);
-
-
     get_hl_iseq()->append(new Instruction(opcode, v_temp, reg));
-
     n->set_operand(v_temp);
-  } else { //TODO: pointer computations
-
+  } else if (op == "*") {
+    n->set_operand(Operand(Operand::VREG_MEM, reg.get_base_reg()));
+  } else if (op == "&") {
+    int i_addr = m_function->get_vra()->alloc_local();
+    Operand addr = Operand(Operand::VREG, i_addr);
+    get_hl_iseq()->append(new Instruction(HINS_localaddr, addr, reg));
+    n->set_operand(Operand(Operand::VREG, addr.get_base_reg()));
   }
 
 }
@@ -477,7 +479,7 @@ void HighLevelCodegen::visit_literal_value(Node *n) {
     get_hl_iseq()->append(new Instruction(mov_opcode, dest, Operand(Operand::IMM_IVAL, val.get_int_value())));
   } else { //TODO: fix char
     std::string lit_str = n->get_kid(0)->get_str();
-    get_hl_iseq()->append(new Instruction(mov_opcode, dest, Operand(Operand::IMM_LABEL, val.get_char_value())));
+    get_hl_iseq()->append(new Instruction(mov_opcode, dest, Operand(Operand::IMM_IVAL, lit_str)));
   }
   n->set_operand(dest);
 }
