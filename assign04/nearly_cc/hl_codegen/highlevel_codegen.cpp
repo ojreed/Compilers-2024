@@ -269,7 +269,7 @@ void HighLevelCodegen::visit_binary_expression(Node *n) {
     get_hl_iseq()->append(new Instruction(opcode, l_reg, r_reg));
 
     n->set_operand(l_reg);
-  } else { //arithmatic  
+  } else { //arithmatic
     if (op == "+") {
       opcode = get_opcode(HINS_add_b, n->get_type());
     } else if (op == "-") {
@@ -346,7 +346,11 @@ void HighLevelCodegen::visit_function_call_expression(Node *n) {
     int index = std::distance(arg_list->cbegin(), i) + 1;
 
     //get assignment op
-    HighLevelOpcode opcode = get_opcode(HINS_mov_b, arg->get_type());
+    std::shared_ptr<Type> target_type = arg->get_type();
+    if (target_type->is_array()){
+      target_type = target_type->get_base_type();
+    }
+    HighLevelOpcode opcode = get_opcode(HINS_mov_b, target_type);
 
     //get fn register
     Operand f_reg = Operand(Operand::VREG, index);
