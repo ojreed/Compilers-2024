@@ -1,10 +1,13 @@
 int main(void) {
-  int arr[10];
-  int *p;
+  int a, b, c;
 
-  p = arr; // this should be allowed
+  a = 2;
+  b = 3;
+  c = 1;
 
-  *p = 42; // sets the first element to 42
+  if (a + 1 == b) {
+    c = 0;
+  }
 
-  return 0;
+  return c;
 }

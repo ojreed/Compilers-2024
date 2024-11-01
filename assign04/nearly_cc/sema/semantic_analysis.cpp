@@ -682,6 +682,7 @@ void SemanticAnalysis::visit_literal_value(Node *n) {
     n->set_type(std::make_shared<BasicType>(BasicTypeKind::CHAR, true));
   }
   n->set_literal();
+  n->set_str("Literal Value");
 }
 
 SymbolTable *SemanticAnalysis::enter_scope(const std::string &name) {

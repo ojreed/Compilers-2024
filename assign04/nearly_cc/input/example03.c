@@ -1,8 +1,14 @@
-void incr(int *p);
-
 int main(void) {
-  int a;
-  a = 1;
-  incr(&a);
-  return a;
+  int i, n, sum;
+
+  i = 1;
+  n = 11;
+  sum = 0;
+
+  do {
+    sum = sum + i;
+    i = i + 1;
+  } while (i < n);
+
+  return sum;
 }

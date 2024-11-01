@@ -60,6 +60,8 @@ void LocalStorageAllocation::visit_function_definition(Node *n) {
       s->set_reg(m_function->get_vra()->alloc_local());
     }
     allocated+=1;
+    m_storage_calc.finish();
+    n->set_total_local_storage(m_storage_calc.get_size());
     // printf("Register: %d, Offset: %d\n",s->get_reg(),s->get_al());
   }
 }

@@ -1,6 +1,8 @@
+// test string output
+
+void print_str(const char *s);
+
 int main(void) {
-  int a, b;
-  a = 3;
-  b = 4;
-  return a < b;
+  print_str("Hello, world\n");
+  return 0;
 }

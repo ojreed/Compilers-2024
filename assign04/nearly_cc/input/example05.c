@@ -5,7 +5,9 @@ int sum(int a, int b) {
 }
 
 int main(void) {
-  int x;
-  x = sum(3, 4);
-  return x;
+  int x, y, z;
+  x = 2;
+  y = 3;
+  z = sum(x, y);
+  return z;
 }

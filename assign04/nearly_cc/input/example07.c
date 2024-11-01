@@ -1,13 +1,15 @@
 int main(void) {
-  int x;
-  int *p;
-  volatile int *q;
+  int a, b, c;
 
+  a = 2;
+  b = 3;
+  c = 0;
 
-  p = &x;
+  if (a + 1 == b) {
+    c = 1;
+  } else {
+    c = 2;
+  }
 
-  q = p; // this is ok: the base type of the pointer variable being assigned
-         // to can have more qualifiers than the pointer type being assigned
-
-  return 0;
+  return c;
 }

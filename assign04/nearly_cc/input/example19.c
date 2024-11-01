@@ -1,11 +1,12 @@
-int sum(int a, int b) {
-  int c;
-  c = a + b;
-  return c;
-}
+// test for an integer promotion
+
+void print_i32(int n);
+void print_nl(void);
 
 int main(void) {
-  int x;
-  x = sum(17, 42);
-  return x;
+  char c;
+  c = -67;
+  print_i32(c);
+  print_nl();
+  return 0;
 }

@@ -70,9 +70,8 @@ void HighLevelCodegen::visit_function_definition(Node *n) {
   m_return_label_name = ".L" + fn_name + "_return";
 
   unsigned total_local_storage = 0U;
-/*
+
   total_local_storage = n->get_total_local_storage();
-*/
 
   get_hl_iseq()->append(new Instruction(HINS_enter, Operand(Operand::IMM_IVAL, total_local_storage)));
 
@@ -245,7 +244,7 @@ void HighLevelCodegen::visit_if_else_statement(Node *n) {
   //else body 
   get_hl_iseq()->define_label(m_body2_label_name);
   Node* else_body = n->get_kid(2);
-  visit(else_body);  //TODO ELSE IF IS FAILING
+  visit(else_body);  //TODO: ELSE IF IS FAILING
   get_hl_iseq()->append(new Instruction(HINS_jmp, Operand(Operand::LABEL, m_bottom_label_name)));//exit if
 
   get_hl_iseq()->define_label(m_bottom_label_name);
@@ -278,6 +277,8 @@ void HighLevelCodegen::visit_binary_expression(Node *n) {
       opcode = get_opcode(HINS_mul_b, n->get_type());
     } else if (op == "/") {
       opcode = get_opcode(HINS_div_b, n->get_type());
+    } else if (op == "%") {
+      opcode = get_opcode(HINS_mod_b, n->get_type());
     } else if (op == "<") {
       opcode = get_opcode(HINS_cmplt_b , n->get_type());
     } else if (op == "<=") {
@@ -297,7 +298,9 @@ void HighLevelCodegen::visit_binary_expression(Node *n) {
     Operand v_temp = Operand(Operand::VREG, i_v_temp);
 
 
-    get_hl_iseq()->append(new Instruction(opcode, v_temp, l_reg, r_reg));
+    Instruction* inst = new Instruction(opcode, v_temp, l_reg, r_reg);
+    inst->set_comment("Execute the \"" + op + "\" Binary Operation");
+    get_hl_iseq()->append(inst);
 
     n->set_operand(v_temp);
   }
@@ -323,14 +326,18 @@ void HighLevelCodegen::visit_unary_expression(Node *n) {
     //setup temp destintation
     int i_v_temp = m_function->get_vra()->alloc_local();
     Operand v_temp = Operand(Operand::VREG, i_v_temp);
-    get_hl_iseq()->append(new Instruction(opcode, v_temp, reg));
+    Instruction* inst = new Instruction(opcode, v_temp, reg);
+    inst->set_comment("Compute Unary Operation");
+    get_hl_iseq()->append(inst);
     n->set_operand(v_temp);
   } else if (op == "*") {
     n->set_operand(Operand(Operand::VREG_MEM, reg.get_base_reg()));
   } else if (op == "&") {
     int i_addr = m_function->get_vra()->alloc_local();
     Operand addr = Operand(Operand::VREG, i_addr);
-    get_hl_iseq()->append(new Instruction(HINS_localaddr, addr, reg));
+    Instruction* inst = new Instruction(HINS_localaddr, addr, reg);
+    inst->set_comment("Store pointer to local variable");
+    get_hl_iseq()->append(inst);
     n->set_operand(Operand(Operand::VREG, addr.get_base_reg()));
   }
 
@@ -358,16 +365,20 @@ void HighLevelCodegen::visit_function_call_expression(Node *n) {
     //get source register
     Operand s_reg = arg->get_operand();
 
-    get_hl_iseq()->append(new Instruction(opcode, f_reg, s_reg));
+    Instruction* inst = new Instruction(opcode, f_reg, s_reg);
+    inst->set_comment("Input Parameter: " + arg->get_str());
+    get_hl_iseq()->append(inst);
   }
-  get_hl_iseq()->append(new Instruction(HINS_call, Operand(Operand::LABEL,fn_name)));//function call
+  Instruction* inst = new Instruction(HINS_call, Operand(Operand::LABEL,fn_name));
+  inst->set_comment("Call Function");
+  get_hl_iseq()->append(inst);
   n->set_operand(Operand(Operand::VREG,0));//return statement
 }
 
 void HighLevelCodegen::visit_field_ref_expression(Node *n) {
   Node* ident = n->get_kid(0);
   visit(ident);
-  int struct_mem = ident->get_operand().get_base_reg();
+  Operand struct_reg = ident->get_operand();
   Symbol* struct_sym = ident->get_symbol();
 
   //get member offset
@@ -378,19 +389,24 @@ void HighLevelCodegen::visit_field_ref_expression(Node *n) {
   //Store Struct Address in VReg
   int i_addr = m_function->get_vra()->alloc_local();
   Operand addr = Operand(Operand::VREG, i_addr);
-  LiteralValue arr_mem_val = LiteralValue(struct_mem,false,false);
-  get_hl_iseq()->append(new Instruction(HINS_localaddr, addr, Operand(Operand::IMM_IVAL, arr_mem_val.get_int_value())));
+  Instruction* inst = new Instruction(HINS_mov_q, addr, struct_reg);
+  inst->set_comment("Store Struct Address");
+  get_hl_iseq()->append(inst);
 
   //Store member offset Address in VReg
   int i_offset = m_function->get_vra()->alloc_local();
   Operand offset_reg = Operand(Operand::VREG, i_offset);
   LiteralValue offset_mem_val = LiteralValue(member_offset,false,false);
-  get_hl_iseq()->append(new Instruction(HINS_mov_q, offset_reg, Operand(Operand::IMM_IVAL, offset_mem_val.get_int_value())));
+  inst = new Instruction(HINS_mov_q, offset_reg, Operand(Operand::IMM_IVAL, offset_mem_val.get_int_value()));
+  inst->set_comment("Store Member offset in VReg");
+  get_hl_iseq()->append(inst);
 
   //Add offset to Struct
   int i_new_addr = m_function->get_vra()->alloc_local();
   Operand new_addr = Operand(Operand::VREG, i_new_addr);
-  get_hl_iseq()->append(new Instruction(HINS_add_q, new_addr, offset_reg, addr));
+  inst = new Instruction(HINS_add_q, new_addr, offset_reg, addr);
+  inst->set_comment("Compute struct member address from struct_base+computed_offset");
+  get_hl_iseq()->append(inst);
 
   //Pass up (Struct+Offset)
   n->set_operand(Operand(Operand::VREG_MEM, new_addr.get_base_reg()));
@@ -399,8 +415,7 @@ void HighLevelCodegen::visit_field_ref_expression(Node *n) {
 void HighLevelCodegen::visit_indirect_field_ref_expression(Node *n) {
   Node* ident = n->get_kid(0);
   visit(ident);
-  int struct_mem = ident->get_operand().get_base_reg();
-;
+  Operand struct_reg = ident->get_operand();
 
   //get member offset
   Node* member = n->get_kid(1);
@@ -410,19 +425,24 @@ void HighLevelCodegen::visit_indirect_field_ref_expression(Node *n) {
   //Store Struct Address in VReg
   int i_addr = m_function->get_vra()->alloc_local();
   Operand addr = Operand(Operand::VREG, i_addr);
-  LiteralValue arr_mem_val = LiteralValue(struct_mem,false,false);
-  get_hl_iseq()->append(new Instruction(HINS_mov_q, addr, Operand(Operand::IMM_IVAL, arr_mem_val.get_int_value())));
+  Instruction* inst = new Instruction(HINS_mov_q, addr, struct_reg);
+  inst->set_comment("Store Struct Address");
+  get_hl_iseq()->append(inst);
 
   //Store member offset Address in VReg
   int i_offset = m_function->get_vra()->alloc_local();
   Operand offset_reg = Operand(Operand::VREG, i_offset);
   LiteralValue offset_mem_val = LiteralValue(member_offset,false,false);
-  get_hl_iseq()->append(new Instruction(HINS_mov_q, offset_reg, Operand(Operand::IMM_IVAL, offset_mem_val.get_int_value())));
+  inst = new Instruction(HINS_mov_q, offset_reg, Operand(Operand::IMM_IVAL, offset_mem_val.get_int_value()));
+  inst->set_comment("Store Member offset in VReg");
+  get_hl_iseq()->append(inst);
 
   //Add offset to Struct
   int i_new_addr = m_function->get_vra()->alloc_local();
   Operand new_addr = Operand(Operand::VREG, i_new_addr);
-  get_hl_iseq()->append(new Instruction(HINS_add_q, new_addr, offset_reg, addr));
+  inst = new Instruction(HINS_add_q, new_addr, offset_reg, addr);
+  inst->set_comment("Compute struct member address from struct_base+computed_offset");
+  get_hl_iseq()->append(inst);
 
   //Pass up (Struct+Offset)
   n->set_operand(Operand(Operand::VREG_MEM, new_addr.get_base_reg()));
@@ -431,7 +451,7 @@ void HighLevelCodegen::visit_indirect_field_ref_expression(Node *n) {
 void HighLevelCodegen::visit_array_element_ref_expression(Node *n) {
   Node* arr = n->get_kid(0);
   visit(arr);
-  int arr_mem = arr->get_operand().get_base_reg();
+  Operand arr_reg = arr->get_operand();
   std::shared_ptr<Type> arr_type = arr->get_symbol()->get_type()->get_base_type();
   int value_size = arr_type->get_storage_size();
 
@@ -442,19 +462,24 @@ void HighLevelCodegen::visit_array_element_ref_expression(Node *n) {
   //Store Array Address in VReg
   int i_addr = m_function->get_vra()->alloc_local();
   Operand addr = Operand(Operand::VREG, i_addr);
-  LiteralValue arr_mem_val = LiteralValue(arr_mem,false,false);
-  get_hl_iseq()->append(new Instruction(HINS_localaddr, addr, Operand(Operand::IMM_IVAL, arr_mem_val.get_int_value())));
+  Instruction* inst = new Instruction(HINS_mov_q, addr, arr_reg);
+  inst->set_comment("Store Array Address");
+  get_hl_iseq()->append(inst);
 
   //Compute offset = index*size
   int i_IxS = m_function->get_vra()->alloc_local();
   Operand IxS = Operand(Operand::VREG, i_IxS);
   LiteralValue l_size = LiteralValue(value_size,false,false);
-  get_hl_iseq()->append(new Instruction(HINS_mul_q, IxS, index_reg, Operand(Operand::IMM_IVAL, l_size.get_int_value())));
+  inst = new Instruction(HINS_mul_q, IxS, index_reg, Operand(Operand::IMM_IVAL, l_size.get_int_value()));
+  inst->set_comment("Compute offset from index*data_size");
+  get_hl_iseq()->append(inst);
 
   //Add offset to Array
   int i_new_addr = m_function->get_vra()->alloc_local();
   Operand new_addr = Operand(Operand::VREG, i_new_addr);
-  get_hl_iseq()->append(new Instruction(HINS_add_q, new_addr, IxS, addr));
+  inst = new Instruction(HINS_add_q, new_addr, IxS, addr);
+  inst->set_comment("Compute final address from Array_Base+Computed_Offset");
+  get_hl_iseq()->append(inst);
 
   //Pass up (Array+Offset)
   n->set_operand(Operand(Operand::VREG_MEM, new_addr.get_base_reg()));
@@ -465,7 +490,12 @@ void HighLevelCodegen::visit_variable_ref(Node *n) {
   if (s->get_reg() != -1) {
     n->set_operand(Operand(Operand::VREG, s->get_reg()));
   } else if (s->get_al() != -1) {
-    n->set_operand(Operand(Operand::VREG_MEM, s->get_al()));
+    int i_addr = m_function->get_vra()->alloc_local();
+    Operand addr = Operand(Operand::VREG, i_addr);
+    Instruction* inst = new Instruction(HINS_localaddr, addr, Operand(Operand::IMM_IVAL, s->get_al()));
+    inst->set_comment("Store stack memory in a VReg");
+    get_hl_iseq()->append(inst);
+    n->set_operand(addr);
   } else {
     SemanticError::raise(n->get_loc(), "for some reason owen was very silly and did not allocate virtual storage for this variable");
   }

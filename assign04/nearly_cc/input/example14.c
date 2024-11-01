@@ -1,6 +1,11 @@
+// a relatively simple example program using an array
+
 int main(void) {
-  int a, b;
-  a = 0;
-  b = 1;
-  return a || b;
+  int arr[1], sum;
+
+  arr[0] = 2;
+
+  sum = arr[0] + 1;
+
+  return sum;
 }

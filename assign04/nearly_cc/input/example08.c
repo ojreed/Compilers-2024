@@ -1,14 +1,15 @@
 int main(void) {
-  int arr[10];
+  int a, b, c;
 
-  int *p;
+  a = 2;
+  b = 3;
+  c = 0;
 
-  p = &arr[0];
-
-  int i;
-  for (i = 0; i < 10; i = i + 1) {
-    p[i] = i; // subscripting using a pointer should be allowed
+  if (a + 2 == b) {
+    c = 1;
+  } else {
+    c = 2;
   }
 
-  return 0;
+  return c;
 }

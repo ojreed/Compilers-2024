@@ -46,6 +46,7 @@ private:
   NodeBase &operator=(const NodeBase &);
   std::shared_ptr<Type> m_type;
   Symbol* m_symbol;
+  unsigned m_TLS;
 
 public:
   NodeBase();
@@ -59,6 +60,8 @@ public:
   std::shared_ptr<Type> get_type() const;
   void set_literal() {this->is_literal=true;};
   bool get_literal() {return this->is_literal;}
+  unsigned get_total_local_storage() {return m_TLS;}
+  void set_total_local_storage(unsigned TLS) {m_TLS = TLS;}
 };
 
 #endif // NODE_BASE_H
