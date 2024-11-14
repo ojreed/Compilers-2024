@@ -75,6 +75,29 @@ void HighLevelCodegen::visit_function_definition(Node *n) {
 
   get_hl_iseq()->append(new Instruction(HINS_enter, Operand(Operand::IMM_IVAL, total_local_storage)));
 
+  Node* parameter_list = n->get_kid(2);
+
+  for (auto i = parameter_list->cbegin(); i != parameter_list->cend(); ++i) {
+    //setup
+    Node *param = *i;
+    int index = std::distance(parameter_list->cbegin(), i) + 1;
+
+    HighLevelOpcode opcode = get_opcode(HINS_mov_b, param->get_type());
+
+    //get local input register
+    int i_local = m_function->get_vra()->alloc_local();
+    Operand local_reg = Operand(Operand::VREG, i_local);
+
+    //get source register
+    Operand input_reg = Operand(Operand::VREG, index);
+
+    Instruction* inst = new Instruction(opcode, local_reg, input_reg);
+    inst->set_comment("Moving Input Parameter " + std::to_string(index)  + " to local vr" + std::to_string(i_local));
+    get_hl_iseq()->append(inst);
+
+    param->get_symbol()->set_reg(i_local); //change symbol table to encode new local register for input value
+  }
+
   // visit body
   visit(n->get_kid(3));
 
@@ -510,10 +533,14 @@ void HighLevelCodegen::visit_literal_value(Node *n) {
   LiteralValue val;
   if (n->get_type()->get_basic_type_kind() == BasicTypeKind::INT) {
     val = LiteralValue(std::stoi(n->get_kid(0)->get_str()),false,false);
-    get_hl_iseq()->append(new Instruction(mov_opcode, dest, Operand(Operand::IMM_IVAL, val.get_int_value())));
+    Instruction* inst = new Instruction(mov_opcode, dest, Operand(Operand::IMM_IVAL, val.get_int_value()));
+    inst->set_comment("Initialize literal int");
+    get_hl_iseq()->append(inst);
   } else { //TODO: fix char
     std::string lit_str = n->get_kid(0)->get_str();
-    get_hl_iseq()->append(new Instruction(mov_opcode, dest, Operand(Operand::IMM_IVAL, lit_str)));
+    Instruction* inst = new Instruction(mov_opcode, dest, Operand(Operand::IMM_IVAL, lit_str));
+    inst->set_comment("Initialize literal char");
+    get_hl_iseq()->append(inst);
   }
   n->set_operand(dest);
 }

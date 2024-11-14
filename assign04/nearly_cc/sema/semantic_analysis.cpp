@@ -297,18 +297,18 @@ void SemanticAnalysis::visit_function_parameter(Node *n) {
   if (declarator->get_tag() == AST_NAMED_DECLARATOR) {//basic parameters
     visit_named_declarator(declarator);
     n->set_type(declarator->get_type());
-    m_cur_symtab->add_entry(n->get_loc(),SymbolKind::VARIABLE,declarator->get_str(),declarator->get_type());
+    n->set_symbol(m_cur_symtab->add_entry(n->get_loc(),SymbolKind::VARIABLE,declarator->get_str(),declarator->get_type()));
   } else if (declarator->get_tag() == AST_ARRAY_DECLARATOR) {//arrays cast to funky pointers
     std::shared_ptr<Type> type(new PointerType(declarator->get_type()));
     declarator->reset_type(type);
-    m_cur_symtab->add_entry(n->get_loc(),SymbolKind::VARIABLE,declarator->get_kid(0)->get_kid(0)->get_str(),declarator->get_type());
+    n->set_symbol(m_cur_symtab->add_entry(n->get_loc(),SymbolKind::VARIABLE,declarator->get_kid(0)->get_kid(0)->get_str(),declarator->get_type()));
     n->set_type(type);
   } else if (declarator->get_tag() == AST_POINTER_DECLARATOR) {//pointers
     visit_pointer_declarator(declarator);
     n->set_type(declarator->get_type());
-    m_cur_symtab->add_entry(n->get_loc(),SymbolKind::VARIABLE,declarator->get_str(),declarator->get_type());
+    n->set_symbol(m_cur_symtab->add_entry(n->get_loc(),SymbolKind::VARIABLE,declarator->get_str(),declarator->get_type()));
   }
-  
+
 }
 
 

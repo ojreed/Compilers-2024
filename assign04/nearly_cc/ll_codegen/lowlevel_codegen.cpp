@@ -18,8 +18,22 @@
 // ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 // OTHER DEALINGS IN THE SOFTWARE.
 
+
+/*
+TODO LIST:
+1) BASIC CODE FUNCTIONALITY
+2) fix LEAQ
+3) other GS comments
+4) circle back to fix whatever the issue is with high examples
+5) circle back to implement proper type casting
+
+*/
+
+
+
 #include <cassert>
 #include <map>
+#include <sstream>
 #include "node.h"
 #include "instruction.h"
 #include "operand.h"
@@ -29,6 +43,8 @@
 #include "highlevel_formatter.h"
 #include "exceptions.h"
 #include "lowlevel_codegen.h"
+
+int get_size(HighLevelOpcode opcode);
 
 // This map has some "obvious" translations of high-level opcodes to
 // low-level opcodes.
@@ -127,7 +143,21 @@ std::shared_ptr<InstructionSequence> LowLevelCodeGen::translate_hl_to_ll(std::sh
   // *must* have storage allocated in memory (e.g., arrays), and also
   // any additional memory that is needed for virtual registers,
   // spilled machine registers, etc.
-  m_total_memory_storage = 120; // FIXME: determine how much memory storage on the stack is needed
+
+  m_total_memory_storage = funcdef_ast->get_total_local_storage();
+  m_register_base = m_total_memory_storage;
+  Symbol *fn_id = funcdef_ast->get_kid(1)->get_symbol();
+  SymbolTable *l_symtab = fn_id->get_symtab_k();
+  for (auto i = l_symtab->cbegin(); i != l_symtab->cend(); ++i) { //for all local vars
+    Symbol *s = *i;
+    if (s->get_type()->is_array() || s->get_type()->is_struct()){//needs mem_alloc
+
+      /*do nothing already allocated*/
+
+    } else { //can be stored in register
+      m_total_memory_storage += 8;
+    }
+  }
 
   // The function prologue will push %rbp, which should guarantee that the
   // stack pointer (%rsp) will contain an address that is a multiple of 16.
@@ -223,18 +253,31 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
       ll_iseq->append(new Instruction(MINS_SUBQ, Operand(Operand::IMM_IVAL, m_total_memory_storage), Operand(Operand::MREG64, MREG_RSP)));
 
     // save callee-saved registers (if any)
-    // TODO: if you allocated callee-saved registers as storage for local variables,
-    //       emit pushq instructions to save their original values
+    //if you allocated callee-saved registers as storage for local variables,
+    //emit pushq instructions to save their original values
+    std::vector<MachineReg> callee_saved = {MREG_RBP, MREG_RBX, MREG_R12, MREG_R13, MREG_R14, MREG_R15};
+    for (MachineReg reg : callee_saved) {
+      Instruction* push_inst = new Instruction(MINS_PUSHQ, Operand(Operand::MREG64,reg));
+      push_inst->set_comment("Pushing Callee saved to stack");
+      ll_iseq->append(push_inst);
+    }
 
     return;
   }
+
 
   if (hl_opcode == HINS_leave) {
     // Function epilogue: deallocate local storage area and restore original value
     // of %rbp
 
-    // TODO: if you allocated callee-saved registers as storage for local variables,
-    //       emit popq instructions to save their original values
+    //if you allocated callee-saved registers as storage for local variables,
+    //emit popq instructions to save their original values
+    std::vector<MachineReg> callee_saved = {MREG_RBP, MREG_RBX, MREG_R12, MREG_R13, MREG_R14, MREG_R15};
+    for (int i = callee_saved.size() - 1; i >= 0; --i){//reverse iterate for popq
+      Instruction* push_inst = new Instruction(MINS_POPQ, Operand(Operand::MREG64,callee_saved[i]));
+      push_inst->set_comment("Popping callee saved back to proper register");
+      ll_iseq->append(push_inst);
+    }
 
     if (m_total_memory_storage > 0)
       ll_iseq->append(new Instruction(MINS_ADDQ, Operand(Operand::IMM_IVAL, m_total_memory_storage), Operand(Operand::MREG64, MREG_RSP)));
@@ -256,7 +299,309 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
   // for choosing the appropriate low-level instructions and
   // machine register operands.
 
+
+
+  
+
+  std::set<HighLevelOpcode> ARITH_OPS = {HINS_add_b,HINS_add_w,HINS_add_l,HINS_add_q,
+                                         HINS_sub_b,HINS_sub_w,HINS_sub_l,HINS_sub_q,
+                                         HINS_div_b,HINS_div_w,HINS_div_l,HINS_div_q,
+                                         HINS_mul_b,HINS_mul_w,HINS_mul_l,HINS_mul_q,
+                                         HINS_mod_b,HINS_mod_w,HINS_mod_l,HINS_mod_q};
+
+  if (ARITH_OPS.count(hl_opcode) > 0) {//found a binary arithmatic operation
+    Operand dest = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
+    Operand src1 = get_ll_operand(hl_ins->get_operand(1), get_size(hl_opcode),ll_iseq);
+    Operand src2 = get_ll_operand(hl_ins->get_operand(2), get_size(hl_opcode),ll_iseq);
+
+    //FORMAT TOP COMMENT
+    Instruction* no_inst = new Instruction(HL_TO_LL.at(HINS_nop));
+    std::string comment;
+    if (match_hl(hl_opcode,HINS_add_b)){
+      comment = "dst = src1 + src2";
+    } else if (match_hl(HINS_sub_b,hl_opcode)){
+      comment = "dst = src1 - src2";
+    } else if (match_hl(HINS_mul_b,hl_opcode)){
+      comment = "dst = src1 * src2";
+    } else if (match_hl(HINS_div_b,hl_opcode)){
+      comment = "dst = src1 / src2";
+    } else if (match_hl(HINS_mod_b,hl_opcode)){
+      comment = "dst = src1 \% src2";
+    }
+    no_inst->set_comment(comment);
+    ll_iseq->append(no_inst);
+
+    //MOVE SOURCE1 to DST
+    LowLevelOpcode mov_opcode = select_ll_opcode(HL_TO_LL.at(HINS_mov_b), get_size(hl_opcode));
+    Instruction* mv_inst = new Instruction(mov_opcode, src1, dest);
+    mv_inst->set_comment("Moving Operand 1 to dst");
+    ll_iseq->append(mv_inst);
+
+    //APPLY SOURCE2 to DST
+    LowLevelOpcode arith_opcode = select_ll_opcode(HL_TO_LL.at(hl_opcode), get_size(hl_opcode));
+    Instruction* op_inst = new Instruction(arith_opcode, src2, dest);
+    op_inst->set_comment("Applying operation to DST with Operand 2");
+    ll_iseq->append(op_inst);
+
+    return;
+  }
+
+  std::set<HighLevelOpcode> CMP_OPS = {HINS_cmplt_b,HINS_cmplt_w,HINS_cmplt_l,HINS_cmplt_q,
+                                       HINS_cmplte_b,HINS_cmplte_w,HINS_cmplte_l,HINS_cmplte_q,
+                                       HINS_cmpgt_b,HINS_cmpgt_w,HINS_cmpgt_l,HINS_cmpgt_q,
+                                       HINS_cmpgte_b,HINS_cmpgte_w,HINS_cmpgte_l,HINS_cmpgte_q,
+                                       HINS_cmpeq_b,HINS_cmpeq_w,HINS_cmpeq_l,HINS_cmpeq_q,
+                                       HINS_cmpneq_b,HINS_cmpneq_w,HINS_cmpneq_l,HINS_cmpneq_q};
+
+  if (CMP_OPS.count(hl_opcode) > 0) {//found a binary comparison operation
+    Operand dest = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
+    Operand src1 = get_ll_operand(hl_ins->get_operand(1), get_size(hl_opcode),ll_iseq);
+    Operand src2 = get_ll_operand(hl_ins->get_operand(2), get_size(hl_opcode),ll_iseq);
+
+    //FORMAT TOP COMMENT
+    Instruction* no_inst = new Instruction(HL_TO_LL.at(HINS_nop));
+    std::string comment;
+    int offset = 0;
+    if (match_hl(HINS_cmplt_b,hl_opcode)){
+      comment = "dst = src2 < src1";
+      offset = 0;
+    } else if (match_hl(HINS_cmplte_b,hl_opcode)){
+      comment = "dst = src2 <= src1";
+      offset = 1;
+    } else if (match_hl(HINS_cmpgt_b,hl_opcode)){
+      comment = "dst = src2 > src1";
+      offset = 2;
+    } else if (match_hl(HINS_cmpgte_b,hl_opcode)){
+      comment = "dst = src2 >= src1";
+      offset = 3;
+    } else if (match_hl(HINS_cmpeq_b,hl_opcode)){
+      comment = "dst = src2 == src1";
+      offset = 4;
+    } else if (match_hl(HINS_cmpneq_b,hl_opcode)){
+      comment = "dst = src2 != src1";
+      offset = 5;
+    }
+    no_inst->set_comment(comment);
+    ll_iseq->append(no_inst);
+
+    //Compare SOURCE2 to SOURCE1
+    LowLevelOpcode mov_opcode = select_ll_opcode(MINS_CMPB, get_size(hl_opcode));
+    Instruction* mv_inst = new Instruction(mov_opcode, src2, src1);
+    mv_inst->set_comment("Compare SRC1 and SRC2");
+    ll_iseq->append(mv_inst);
+
+    //SET DST to FLAG
+    LowLevelOpcode setter = LowLevelOpcode(MINS_SETL + offset);
+    Instruction* op_inst = new Instruction(setter, dest);
+    op_inst->set_comment("Store Result Flag in DST");
+    ll_iseq->append(op_inst);
+
+    return;
+  }
+
+  std::set<HighLevelOpcode> UNA_OPS = {HINS_neg_b,HINS_neg_w,HINS_neg_l,HINS_neg_q,
+                                       HINS_not_b,HINS_not_w,HINS_not_l,HINS_not_q};
+
+  if (UNA_OPS.count(hl_opcode) > 0) {//found a unary operation
+    
+    Operand target = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
+
+    if (match_hl(hl_opcode,HINS_neg_b)){
+      //COMMENT
+      Instruction* no_inst = new Instruction(HL_TO_LL.at(HINS_nop));
+      std::stringstream comment;
+      comment << target.get_base_reg() << " = -" << target.get_base_reg();
+      no_inst->set_comment(comment.str());
+      ll_iseq->append(no_inst);
+
+      //OPERATION
+      LowLevelOpcode arith_opcode = select_ll_opcode(HL_TO_LL.at(HINS_mul_b), get_size(hl_opcode));
+      LiteralValue neg = LiteralValue(-1,false,false);
+      Instruction* neg_inst = new Instruction(arith_opcode,  Operand(Operand::IMM_IVAL, -1), target);
+      neg_inst->set_comment("Negate target through multiplication by -1");
+      ll_iseq->append(neg_inst);
+
+
+    } else {
+      //COMMENT
+      Instruction* no_inst = new Instruction(HL_TO_LL.at(HINS_nop));
+      std::stringstream comment;
+      comment << target.get_base_reg() << " = !" << target.get_base_reg();
+      no_inst->set_comment(comment.str());
+      ll_iseq->append(no_inst);
+
+      //OPERATION
+      //Compare TARGET to 0
+      Instruction* mv_inst = new Instruction(MINS_CMPB, target, Operand(Operand::IMM_IVAL, 0));
+      mv_inst->set_comment("Compare Target with 0");
+      ll_iseq->append(mv_inst);
+
+      //SET DST to FLAG
+      LowLevelOpcode arith_opcode = select_ll_opcode(HL_TO_LL.at(hl_opcode), get_size(hl_opcode));
+      Instruction* op_inst = new Instruction(arith_opcode, target);
+      op_inst->set_comment("Store Result Flag in DST");
+      ll_iseq->append(op_inst);
+    }
+    return;
+  }
+
+  std::set<HighLevelOpcode> MOV_OPS = {HINS_mov_b,HINS_mov_w,HINS_mov_l,HINS_mov_q};
+
+  if (MOV_OPS.count(hl_opcode) > 0) {//found a move operation
+    Operand dest = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
+    Operand src = get_ll_operand(hl_ins->get_operand(1), get_size(hl_opcode),ll_iseq);
+
+
+    //MOVE SOURCE to DST
+    LowLevelOpcode mov_opcode = select_ll_opcode(HL_TO_LL.at(HINS_mov_b), get_size(hl_opcode));
+    Instruction* mv_inst = new Instruction(mov_opcode, src, dest);
+    mv_inst->set_comment("Moving src to dst");
+    ll_iseq->append(mv_inst);
+
+    return;
+  }
+
+  std::set<HighLevelOpcode> JMP_OPS = {HINS_jmp,HINS_cjmp_t,HINS_cjmp_f};
+
+  if (JMP_OPS.count(hl_opcode) > 0) {//found a jmp operation
+
+
+    //Unconditional JMP to DST
+    if (match_hl(hl_opcode,HINS_jmp)){
+      Operand label = hl_ins->get_operand(0);
+
+      Instruction* mv_inst = new Instruction(MINS_JMP, label);
+      mv_inst->set_comment("jumping to dst");
+      ll_iseq->append(mv_inst);
+    } else if (match_hl(hl_opcode,HINS_cjmp_t)) {
+      Operand dst = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
+      Operand label = hl_ins->get_operand(1);
+      
+      Instruction* cmp_inst = new Instruction(MINS_CMPQ, dst, Operand(Operand::IMM_IVAL, 0));
+      cmp_inst->set_comment("Compare dst with 0");
+      ll_iseq->append(cmp_inst);
+
+      Instruction* jmp_inst = new Instruction(MINS_JNE, label);
+      jmp_inst->set_comment("jumping if to dst if true (dst !=0)");
+      ll_iseq->append(jmp_inst);
+    } else if (match_hl(hl_opcode,HINS_cjmp_f)) {
+      Operand dst = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
+      Operand label = hl_ins->get_operand(1);
+
+      
+      Instruction* cmp_inst = new Instruction(MINS_CMPQ, dst, Operand(Operand::IMM_IVAL, 0));
+      cmp_inst->set_comment("Compare dst with 0");
+      ll_iseq->append(cmp_inst);
+
+      Instruction* jmp_inst = new Instruction(MINS_JE, label);
+      jmp_inst->set_comment("jumping if to dst if false (dst == 0)");
+      ll_iseq->append(jmp_inst);
+    }
+    return;
+  }
+
+  if (hl_opcode == HINS_localaddr) {
+    Operand dst = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
+    Operand immediate = get_ll_operand(hl_ins->get_operand(1), get_size(hl_opcode),ll_iseq);
+    Instruction* mv_inst = new Instruction(MINS_LEAQ, immediate,dst);
+    mv_inst->set_comment("Calling Function");
+    ll_iseq->append(mv_inst);
+
+    return;
+  } 
+
+  if (hl_opcode == HINS_call) {
+    Operand label = hl_ins->get_operand(0);
+    Instruction* mv_inst = new Instruction(MINS_CALL, label);
+    mv_inst->set_comment("Calling Function");
+    ll_iseq->append(mv_inst);
+
+    return;
+  }
+
   RuntimeError::raise("high level opcode %d not handled", int(hl_opcode));
 }
 
 // TODO: implement other private member functions
+Operand LowLevelCodeGen::get_ll_operand(Operand hl_opcode, int size, std::shared_ptr<InstructionSequence> ll_iseq){
+  if (hl_opcode.has_base_reg()){//assert we are passed a VR 
+    if (hl_opcode.get_base_reg()>=10) {//standard VR
+      int reg_index = hl_opcode.get_base_reg()-10;
+      int mem_offset = -1*(m_register_base + 8*reg_index);
+      if (hl_opcode.get_kind() == Operand::VREG_MEM){
+        Operand temp = Operand(Operand::MREG64,MachineReg::MREG_R9);
+        Operand addr = Operand(Operand::MREG64_MEM_OFF,MachineReg::MREG_RBP,mem_offset);
+        Instruction* mv_inst = new Instruction(select_ll_opcode(MINS_MOVB,size), addr, temp);
+        mv_inst->set_comment("Move Address to tmp register");
+        ll_iseq->append(mv_inst);
+        return Operand(Operand::MREG64_MEM,MachineReg::MREG_R9);;  
+      }
+      return Operand(Operand::MREG64_MEM_OFF,MachineReg::MREG_RBP,mem_offset);
+    } else if (hl_opcode.get_base_reg()==0) { //passed return register
+      return Operand(select_mreg_kind(size),MachineReg::MREG_RAX);
+    } else { //passed an input register
+      std::vector<MachineReg> args = {MREG_RDI,MREG_RSI,MREG_RDX,MREG_RCX,MREG_R8,MREG_R9};
+      int reg_index = hl_opcode.get_base_reg() -1;
+      return Operand(select_mreg_kind(size),args[reg_index]);
+    }
+  } else { //passed a literal
+    return hl_opcode;
+  }
+}
+
+
+int get_size(HighLevelOpcode opcode) {
+    switch (opcode) {
+        // 1-byte (8-bit) instructions
+        case HINS_add_b: case HINS_sub_b: case HINS_mul_b: case HINS_div_b:
+        case HINS_mod_b: case HINS_lshift_b: case HINS_rshift_b: case HINS_cmplt_b:
+        case HINS_cmplte_b: case HINS_cmpgt_b: case HINS_cmpgte_b: case HINS_cmpeq_b:
+        case HINS_cmpneq_b: case HINS_and_b: case HINS_or_b: case HINS_xor_b:
+        case HINS_neg_b: case HINS_not_b: case HINS_compl_b: case HINS_inc_b:
+        case HINS_dec_b: case HINS_mov_b: case HINS_spill_b: case HINS_restore_b:
+            return 1;
+
+        // 2-byte (16-bit) instructions
+        case HINS_add_w: case HINS_sub_w: case HINS_mul_w: case HINS_div_w:
+        case HINS_mod_w: case HINS_lshift_w: case HINS_rshift_w: case HINS_cmplt_w:
+        case HINS_cmplte_w: case HINS_cmpgt_w: case HINS_cmpgte_w: case HINS_cmpeq_w:
+        case HINS_cmpneq_w: case HINS_and_w: case HINS_or_w: case HINS_xor_w:
+        case HINS_neg_w: case HINS_not_w: case HINS_compl_w: case HINS_inc_w:
+        case HINS_dec_w: case HINS_mov_w: case HINS_spill_w: case HINS_restore_w:
+            return 2;
+
+        // 4-byte (32-bit) instructions
+        case HINS_add_l: case HINS_sub_l: case HINS_mul_l: case HINS_div_l:
+        case HINS_mod_l: case HINS_lshift_l: case HINS_rshift_l: case HINS_cmplt_l:
+        case HINS_cmplte_l: case HINS_cmpgt_l: case HINS_cmpgte_l: case HINS_cmpeq_l:
+        case HINS_cmpneq_l: case HINS_and_l: case HINS_or_l: case HINS_xor_l:
+        case HINS_neg_l: case HINS_not_l: case HINS_compl_l: case HINS_inc_l:
+        case HINS_dec_l: case HINS_mov_l: case HINS_spill_l: case HINS_restore_l:
+            return 4;
+
+        // 8-byte (64-bit) instructions
+        case HINS_add_q: case HINS_sub_q: case HINS_mul_q: case HINS_div_q:
+        case HINS_mod_q: case HINS_lshift_q: case HINS_rshift_q: case HINS_cmplt_q:
+        case HINS_cmplte_q: case HINS_cmpgt_q: case HINS_cmpgte_q: case HINS_cmpeq_q:
+        case HINS_cmpneq_q: case HINS_and_q: case HINS_or_q: case HINS_xor_q:
+        case HINS_neg_q: case HINS_not_q: case HINS_compl_q: case HINS_inc_q:
+        case HINS_dec_q: case HINS_mov_q: case HINS_spill_q: case HINS_restore_q:
+            return 8;
+
+        // Instructions with no source operand
+        case HINS_ret:
+        case HINS_jmp:
+        case HINS_call:
+        case HINS_enter:
+        case HINS_leave:
+        case HINS_localaddr:
+        case HINS_cjmp_t:
+        case HINS_cjmp_f:
+        case HINS_nop:
+            return 0;
+
+        // Default case for unhandled opcodes
+        default:
+            return 0;
+    }
+}

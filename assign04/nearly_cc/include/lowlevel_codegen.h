@@ -39,6 +39,7 @@ private:
   const Options &m_options;
   std::shared_ptr<Function> m_function;
   int m_total_memory_storage;
+  int m_register_base;
 
 public:
   LowLevelCodeGen(const Options &options);
