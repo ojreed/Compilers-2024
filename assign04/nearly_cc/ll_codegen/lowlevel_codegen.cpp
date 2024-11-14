@@ -22,10 +22,11 @@
 /*
 TODO LIST:
 1) BASIC CODE FUNCTIONALITY
+  - Example03 fix broken loops
 2) fix LEAQ
-3) other GS comments
-4) circle back to fix whatever the issue is with high examples
-5) circle back to implement proper type casting
+4) other GS comments
+5) circle back to fix whatever the issue is with high examples
+6) circle back to implement proper type casting
 
 */
 
@@ -317,7 +318,7 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
     //FORMAT TOP COMMENT
     Instruction* no_inst = new Instruction(HL_TO_LL.at(HINS_nop));
     std::string comment;
-    if (match_hl(hl_opcode,HINS_add_b)){
+    if (match_hl(HINS_add_b,hl_opcode)){
       comment = "dst = src1 + src2";
     } else if (match_hl(HINS_sub_b,hl_opcode)){
       comment = "dst = src1 - src2";
@@ -331,17 +332,24 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
     no_inst->set_comment(comment);
     ll_iseq->append(no_inst);
 
-    //MOVE SOURCE1 to DST
-    LowLevelOpcode mov_opcode = select_ll_opcode(HL_TO_LL.at(HINS_mov_b), get_size(hl_opcode));
-    Instruction* mv_inst = new Instruction(mov_opcode, src1, dest);
-    mv_inst->set_comment("Moving Operand 1 to dst");
-    ll_iseq->append(mv_inst);
+    Operand temp = Operand(select_mreg_kind(get_size(hl_opcode)),MachineReg::MREG_R11);
+    //MOVE SOURCE1 to TEMP
+    LowLevelOpcode mov_t_opcode = select_ll_opcode(MINS_MOVB, get_size(hl_opcode));
+    Instruction* mv_t_inst = new Instruction(mov_t_opcode, src1, temp);
+    mv_t_inst->set_comment("Moving SRC1 to temp");
+    ll_iseq->append(mv_t_inst);
 
-    //APPLY SOURCE2 to DST
-    LowLevelOpcode arith_opcode = select_ll_opcode(HL_TO_LL.at(hl_opcode), get_size(hl_opcode));
-    Instruction* op_inst = new Instruction(arith_opcode, src2, dest);
-    op_inst->set_comment("Applying operation to DST with Operand 2");
+    //APPLY SOURCE2 to TEMP
+    LowLevelOpcode arith_opcode = HL_TO_LL.at(hl_opcode);
+    Instruction* op_inst = new Instruction(arith_opcode, src2, temp);
+    op_inst->set_comment("Applying operation to temp with SRC2");
     ll_iseq->append(op_inst);
+
+    //MOVE TEMP to DST
+    LowLevelOpcode mov_b_opcode = select_ll_opcode(MINS_MOVB, get_size(hl_opcode));
+    Instruction* mv_b_inst = new Instruction(mov_b_opcode, temp, dest);
+    mv_b_inst->set_comment("Moving temp to dest");
+    ll_iseq->append(mv_b_inst);
 
     return;
   }
@@ -384,9 +392,16 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
     no_inst->set_comment(comment);
     ll_iseq->append(no_inst);
 
+    Operand temp = Operand(select_mreg_kind(get_size(hl_opcode)),MachineReg::MREG_R11);
+    //MOVE SOURCE1 to TEMP
+    LowLevelOpcode mov_t_opcode = select_ll_opcode(MINS_MOVB, get_size(hl_opcode));
+    Instruction* mv_t_inst = new Instruction(mov_t_opcode, src1, temp);
+    mv_t_inst->set_comment("Moving SRC1 to temp");
+    ll_iseq->append(mv_t_inst);
+
     //Compare SOURCE2 to SOURCE1
     LowLevelOpcode mov_opcode = select_ll_opcode(MINS_CMPB, get_size(hl_opcode));
-    Instruction* mv_inst = new Instruction(mov_opcode, src2, src1);
+    Instruction* mv_inst = new Instruction(mov_opcode, src2, temp);
     mv_inst->set_comment("Compare SRC1 and SRC2");
     ll_iseq->append(mv_inst);
 
@@ -437,8 +452,7 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
       ll_iseq->append(mv_inst);
 
       //SET DST to FLAG
-      LowLevelOpcode arith_opcode = select_ll_opcode(HL_TO_LL.at(hl_opcode), get_size(hl_opcode));
-      Instruction* op_inst = new Instruction(arith_opcode, target);
+      Instruction* op_inst = new Instruction(MINS_SETNE, target);
       op_inst->set_comment("Store Result Flag in DST");
       ll_iseq->append(op_inst);
     }
@@ -451,12 +465,21 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
     Operand dest = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
     Operand src = get_ll_operand(hl_ins->get_operand(1), get_size(hl_opcode),ll_iseq);
 
+    Operand temp = Operand(select_mreg_kind(get_size(hl_opcode)),MachineReg::MREG_R11);
 
-    //MOVE SOURCE to DST
-    LowLevelOpcode mov_opcode = select_ll_opcode(HL_TO_LL.at(HINS_mov_b), get_size(hl_opcode));
-    Instruction* mv_inst = new Instruction(mov_opcode, src, dest);
-    mv_inst->set_comment("Moving src to dst");
-    ll_iseq->append(mv_inst);
+    //MOVE SOURCE to temp
+    LowLevelOpcode mov_a_opcode = select_ll_opcode(MINS_MOVB, get_size(hl_opcode));
+    Instruction* mv_a_inst = new Instruction(mov_a_opcode, src, temp);
+    mv_a_inst->set_comment("Moving src to temp");
+    ll_iseq->append(mv_a_inst);
+
+    //MOVE temp to DEST
+    LowLevelOpcode mov_b_opcode = select_ll_opcode(MINS_MOVB, get_size(hl_opcode));
+    Instruction* mv_b_inst = new Instruction(mov_b_opcode, temp, dest);
+    mv_b_inst->set_comment("Moving temp to dst");
+    ll_iseq->append(mv_b_inst);
+
+
 
     return;
   }
@@ -476,8 +499,15 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
     } else if (match_hl(hl_opcode,HINS_cjmp_t)) {
       Operand dst = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
       Operand label = hl_ins->get_operand(1);
+
+      Operand temp = Operand(select_mreg_kind(1),MachineReg::MREG_R11);
+      //MOVE Literal to TEMP
+      LowLevelOpcode mov_t_opcode = select_ll_opcode(MINS_MOVB, 1);
+      Instruction* mv_t_inst = new Instruction(mov_t_opcode, Operand(Operand::IMM_IVAL, 0), temp);
+      mv_t_inst->set_comment("Moving dst to temp");
+      ll_iseq->append(mv_t_inst);
       
-      Instruction* cmp_inst = new Instruction(MINS_CMPQ, dst, Operand(Operand::IMM_IVAL, 0));
+      Instruction* cmp_inst = new Instruction(MINS_CMPB, temp, dst);
       cmp_inst->set_comment("Compare dst with 0");
       ll_iseq->append(cmp_inst);
 
@@ -488,8 +518,14 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
       Operand dst = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
       Operand label = hl_ins->get_operand(1);
 
-      
-      Instruction* cmp_inst = new Instruction(MINS_CMPQ, dst, Operand(Operand::IMM_IVAL, 0));
+      Operand temp = Operand(select_mreg_kind(1),MachineReg::MREG_R11);
+      //MOVE Literal to TEMP
+      LowLevelOpcode mov_t_opcode = select_ll_opcode(MINS_MOVB, 1);
+      Instruction* mv_t_inst = new Instruction(mov_t_opcode, Operand(Operand::IMM_IVAL, 0), temp);
+      mv_t_inst->set_comment("Moving dst to temp");
+      ll_iseq->append(mv_t_inst);
+
+      Instruction* cmp_inst = new Instruction(MINS_CMPB, temp, dst);
       cmp_inst->set_comment("Compare dst with 0");
       ll_iseq->append(cmp_inst);
 
@@ -527,9 +563,9 @@ Operand LowLevelCodeGen::get_ll_operand(Operand hl_opcode, int size, std::shared
   if (hl_opcode.has_base_reg()){//assert we are passed a VR 
     if (hl_opcode.get_base_reg()>=10) {//standard VR
       int reg_index = hl_opcode.get_base_reg()-10;
-      int mem_offset = -1*(m_register_base + 8*reg_index);
+      int mem_offset = -1*(m_register_base + 8*(reg_index));
       if (hl_opcode.get_kind() == Operand::VREG_MEM){
-        Operand temp = Operand(Operand::MREG64,MachineReg::MREG_R9);
+        Operand temp = Operand(select_mreg_kind(size),MachineReg::MREG_R9);
         Operand addr = Operand(Operand::MREG64_MEM_OFF,MachineReg::MREG_RBP,mem_offset);
         Instruction* mv_inst = new Instruction(select_ll_opcode(MINS_MOVB,size), addr, temp);
         mv_inst->set_comment("Move Address to tmp register");

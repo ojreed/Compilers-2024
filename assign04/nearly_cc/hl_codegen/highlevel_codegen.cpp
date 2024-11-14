@@ -395,7 +395,16 @@ void HighLevelCodegen::visit_function_call_expression(Node *n) {
   Instruction* inst = new Instruction(HINS_call, Operand(Operand::LABEL,fn_name));
   inst->set_comment("Call Function");
   get_hl_iseq()->append(inst);
-  n->set_operand(Operand(Operand::VREG,0));//return statement
+
+  int i_v_temp = m_function->get_vra()->alloc_local();
+  Operand v_temp = Operand(Operand::VREG, i_v_temp);
+
+  //store in temp
+  Instruction* ret_temp = new Instruction(get_opcode(HINS_mov_b,n->get_type()), v_temp, Operand(Operand::VREG,0));
+  ret_temp->set_comment("store function result in tmp virtual register");
+  get_hl_iseq()->append(ret_temp);
+
+  n->set_operand(v_temp);//return statement
 }
 
 void HighLevelCodegen::visit_field_ref_expression(Node *n) {
