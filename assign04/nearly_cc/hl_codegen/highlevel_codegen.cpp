@@ -362,7 +362,14 @@ void HighLevelCodegen::visit_unary_expression(Node *n) {
     get_hl_iseq()->append(inst);
     n->set_operand(v_temp);
   } else if (op == "*") {
-    n->set_operand(Operand(Operand::VREG_MEM, reg.get_base_reg()));
+    int i_addr = m_function->get_vra()->alloc_local();
+    Operand addr = Operand(Operand::VREG, i_addr);
+    Instruction* inst = new Instruction(HINS_mov_q, addr, reg);
+    inst->set_comment("Store pointer to local variable");
+    get_hl_iseq()->append(inst);
+
+
+    n->set_operand(Operand(Operand::VREG_MEM, addr.get_base_reg()));
   } else if (op == "&") {
     int i_addr = m_function->get_vra()->alloc_local();
     Operand addr = Operand(Operand::VREG, i_addr);
@@ -386,7 +393,7 @@ void HighLevelCodegen::visit_function_call_expression(Node *n) {
     //get assignment op
     std::shared_ptr<Type> target_type = arg->get_type();
     if (target_type->is_array()){
-      target_type = target_type->get_base_type();
+      target_type = std::make_shared<BasicType>(BasicTypeKind::LONG, 0);;
     }
     HighLevelOpcode opcode = get_opcode(HINS_mov_b, target_type);
 
@@ -508,7 +515,7 @@ void HighLevelCodegen::visit_array_element_ref_expression(Node *n) {
 
   //fix index:
   inst = new Instruction(HINS_add_q, index_reg, index_reg, Operand(Operand::IMM_IVAL, 1));
-  inst->set_comment("Compute final address from Array_Base+Computed_Offset");
+  inst->set_comment("Shift Index");
   get_hl_iseq()->append(inst);
 
   //Compute offset = index*size
@@ -524,6 +531,11 @@ void HighLevelCodegen::visit_array_element_ref_expression(Node *n) {
   Operand new_addr = Operand(Operand::VREG, i_new_addr);
   inst = new Instruction(HINS_add_q, new_addr, IxS, addr);
   inst->set_comment("Compute final address from Array_Base+Computed_Offset");
+  get_hl_iseq()->append(inst);
+
+  //re_fix index:
+  inst = new Instruction(HINS_sub_q, index_reg, index_reg, Operand(Operand::IMM_IVAL, 1));
+  inst->set_comment("Unshift Index");
   get_hl_iseq()->append(inst);
 
   //Pass up (Array+Offset)

@@ -27,6 +27,7 @@
 #include "instruction.h"
 #include "instruction_seq.h"
 #include "function.h"
+#include "lowlevel.h"
 
 //! @file
 //! Translation of high-level IR code to Low-level (x86-64) IR code.
@@ -40,6 +41,9 @@ private:
   std::shared_ptr<Function> m_function;
   int m_total_memory_storage;
   int m_register_base;
+  int m_data_base;
+  std::vector<MachineReg> m_spare_regs = {MREG_R9, MREG_R8, MREG_RCX, MREG_RDX, MREG_RSI, MREG_RDI};
+  int m_spare_reg = 0;
 
 public:
   LowLevelCodeGen(const Options &options);

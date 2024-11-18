@@ -1,169 +1,73 @@
 
         .section .text
 
-        .globl sum
-sum:
+        .globl main
+main:
+        enter    $0
+        localaddr vr13, vr11         /* Store pointer to local variable */
+        mov_q    vr12, vr13
+        mov_l    vr14, $42           /* Initialize literal int */
+        mov_q    (vr15), vr12        /* Store Pointed to Value */
+        localaddr vr16, vr15         /* Get Address of ref */
+        mov_l    (vr16), vr14
+        mov_l    vr0, vr11
+.Lmain_return:
+        leave    $0
+        ret      
+bash-5.2$ ./nearly_cc input/example10.c 
+
+        .section .text
+
+        .globl main
+main:
         pushq    %rbp                /* enter    $0 */
         movq     %rsp, %rbp
-        subq     $192, %rsp
+        subq     $112, %rsp
         pushq    %rbp                /* Pushing Callee saved to stack */
         pushq    %rbx                /* Pushing Callee saved to stack */
         pushq    %r12                /* Pushing Callee saved to stack */
         pushq    %r13                /* Pushing Callee saved to stack */
         pushq    %r14                /* Pushing Callee saved to stack */
         pushq    %r15                /* Pushing Callee saved to stack */
-        movq     %rdi, %r11          /* mov_q    vr13, vr1 */
-        movq     %r11, -32(%rbp)     /* Moving temp to dst */
-        movl     %esi, %r11d         /* mov_l    vr14, vr2 */
+        leaq     -16(%rbp), %r12     /* localaddr vr13, vr11 */
+        movq     %r12, -32(%rbp)     /* Moving temp to dst */
+        movq     $0, -24(%rbp)       /* mov_q    vr12, vr13 */
+        movq     $0, %r11            /* Clear temp register */
+        movq     -32(%rbp), %r11     /* Moving src to temp */
+        movq     %r11, -24(%rbp)     /* Moving temp to dst */
+        movq     $0, -40(%rbp)       /* mov_l    vr14, $42 */
+        movq     $0, %r11            /* Clear temp register */
+        movl     $42, %r11d          /* Moving src to temp */
         movl     %r11d, -40(%rbp)    /* Moving temp to dst */
-        movl     $0, %r11d           /* mov_l    vr15, $0 */
-        movl     %r11d, -48(%rbp)    /* Moving temp to dst */
-        movl     -48(%rbp), %r11d    /* mov_l    vr12, vr15 */
-        movl     %r11d, -24(%rbp)    /* Moving temp to dst */
-.L0_for_loop:
-        movl     $0, %r11d           /* mov_l    vr16, $0 */
-        movl     %r11d, -56(%rbp)    /* Moving temp to dst */
-        movl     -56(%rbp), %r11d    /* mov_l    vr11, vr16 */
-        movl     %r11d, -16(%rbp)    /* Moving temp to dst */
-.L0_for_loop_comp:
-        nop                          /* cmplt_l  vr17, vr11, vr14 */
-        movl     -16(%rbp), %r11d    /* Moving SRC1 to temp */
-        cmpl     -40(%rbp), %r11d    /* Compare SRC1 and SRC2 */
-        setl     -64(%rbp)           /* Store Result Flag in DST */
-        movb     $0, %r11b           /* cjmp_f   vr17, .L0_end_for_loop */
-        cmpb     %r11b, -64(%rbp)    /* Compare dst with 0 */
-        je       .L0_end_for_loop    /* jumping if to dst if false (dst == 0) */
-.L0_for_loop_body:
-        movq     -32(%rbp), %r11     /* mov_q    vr18, vr13 */
-        movq     %r11, -72(%rbp)     /* Moving temp to dst */
-        nop                          /* mul_q    vr19, vr11, $4 */
-        movq     -16(%rbp), %r11     /* Moving SRC1 to temp */
-        imulq    $4, %r11            /* Applying operation to temp with SRC2 */
-        movq     %r11, -80(%rbp)     /* Moving temp to dest */
-        nop                          /* add_q    vr20, vr19, vr18 */
-        movq     -80(%rbp), %r11     /* Moving SRC1 to temp */
-        addq     -72(%rbp), %r11     /* Applying operation to temp with SRC2 */
-        movq     %r11, -88(%rbp)     /* Moving temp to dest */
-        movq     -88(%rbp), %r9      /* add_l    vr21, vr12, (vr20) */
-        nop                          /* dst = src1 + src2 */
-        movl     -24(%rbp), %r11d    /* Moving SRC1 to temp */
-        addl     (%r9), %r11d        /* Applying operation to temp with SRC2 */
-        movl     %r11d, -96(%rbp)    /* Moving temp to dest */
-        movl     -96(%rbp), %r11d    /* mov_l    vr12, vr21 */
-        movl     %r11d, -24(%rbp)    /* Moving temp to dst */
-        movl     $1, %r11d           /* mov_l    vr22, $1 */
-        movl     %r11d, -104(%rbp)   /* Moving temp to dst */
-        nop                          /* add_l    vr23, vr11, vr22 */
-        movl     -16(%rbp), %r11d    /* Moving SRC1 to temp */
-        addl     -104(%rbp), %r11d   /* Applying operation to temp with SRC2 */
-        movl     %r11d, -112(%rbp)   /* Moving temp to dest */
-        movl     -112(%rbp), %r11d   /* mov_l    vr11, vr23 */
-        movl     %r11d, -16(%rbp)    /* Moving temp to dst */
-        jmp      .L0_for_loop_comp   /* jmp      .L0_for_loop_comp */
-.L0_end_for_loop:
-        movl     -24(%rbp), %r11d    /* mov_l    vr0, vr12 */
+        movq     $0, %r9             /* mov_q    (vr15), vr12 */
+        movq     -48(%rbp), %r9      /* Move Address to tmp register */
+        movq     $0, (%r9)           /* Clear dest register */
+        movq     $0, %r8             /* Clear tmp register */
+        movq     -48(%rbp), %r8      /* Move Address to tmp register */
+        movq     $0, %r11            /* Clear temp register */
+        movq     -24(%rbp), %r11     /* Moving src to temp */
+        movq     %r11, (%r8)         /* Moving temp to dst */
+        leaq     -48(%rbp), %r12     /* localaddr vr16, vr15 */
+        movq     %r12, -56(%rbp)     /* Moving temp to dst */
+        movq     $0, %rcx            /* mov_l    (vr16), vr14 */
+        movq     -56(%rbp), %rcx     /* Move Address to tmp register */
+        movq     $0, (%rcx)          /* Clear dest register */
+        movq     $0, %rdx            /* Clear tmp register */
+        movq     -56(%rbp), %rdx     /* Move Address to tmp register */
+        movq     $0, %r11            /* Clear temp register */
+        movl     -40(%rbp), %r11d    /* Moving src to temp */
+        movl     %r11d, (%rdx)       /* Moving temp to dst */
+        movq     $0, %rax            /* mov_l    vr0, vr11 */
+        movq     $0, %r11            /* Clear temp register */
+        movl     -16(%rbp), %r11d    /* Moving src to temp */
         movl     %r11d, %eax         /* Moving temp to dst */
-.Lsum_return:
+.Lmain_return:
         popq     %r15                /* leave    $0 */
         popq     %r14                /* Popping callee saved back to proper register */
         popq     %r13                /* Popping callee saved back to proper register */
         popq     %r12                /* Popping callee saved back to proper register */
         popq     %rbx                /* Popping callee saved back to proper register */
         popq     %rbp                /* Popping callee saved back to proper register */
-        addq     $192, %rsp
-        popq     %rbp
-        ret                          /* ret       */
-
-        .globl main
-main:
-        pushq    %rbp                /* enter    $12 */
-        movq     %rsp, %rbp
-        subq     $544, %rsp
-        pushq    %rbp                /* Pushing Callee saved to stack */
-        pushq    %rbx                /* Pushing Callee saved to stack */
-        pushq    %r12                /* Pushing Callee saved to stack */
-        pushq    %r13                /* Pushing Callee saved to stack */
-        pushq    %r14                /* Pushing Callee saved to stack */
-        pushq    %r15                /* Pushing Callee saved to stack */
-        leaq     -12(%rbp), %r12     /* localaddr vr12, $0 */
-        movq     %r12, -36(%rbp)     /* Moving temp to dst */
-        movl     $0, %r11d           /* mov_l    vr13, $0 */
-        movl     %r11d, -44(%rbp)    /* Moving temp to dst */
-        movq     -36(%rbp), %r11     /* mov_q    vr14, vr12 */
-        movq     %r11, -52(%rbp)     /* Moving temp to dst */
-        nop                          /* mul_q    vr15, vr13, $4 */
-        movq     -44(%rbp), %r11     /* Moving SRC1 to temp */
-        imulq    $4, %r11            /* Applying operation to temp with SRC2 */
-        movq     %r11, -60(%rbp)     /* Moving temp to dest */
-        nop                          /* add_q    vr16, vr15, vr14 */
-        movq     -60(%rbp), %r11     /* Moving SRC1 to temp */
-        addq     -52(%rbp), %r11     /* Applying operation to temp with SRC2 */
-        movq     %r11, -68(%rbp)     /* Moving temp to dest */
-        movl     $1, %r11d           /* mov_l    vr17, $1 */
-        movl     %r11d, -76(%rbp)    /* Moving temp to dst */
-        movq     -68(%rbp), %r9      /* mov_l    (vr16), vr17 */
-        movl     -76(%rbp), %r11d    /* Moving src to temp */
-        movl     %r11d, (%r9)        /* Moving temp to dst */
-        leaq     -12(%rbp), %r12     /* localaddr vr18, $0 */
-        movq     %r12, -84(%rbp)     /* Moving temp to dst */
-        movl     $1, %r11d           /* mov_l    vr19, $1 */
-        movl     %r11d, -92(%rbp)    /* Moving temp to dst */
-        movq     -84(%rbp), %r11     /* mov_q    vr20, vr18 */
-        movq     %r11, -100(%rbp)    /* Moving temp to dst */
-        nop                          /* mul_q    vr21, vr19, $4 */
-        movq     -92(%rbp), %r11     /* Moving SRC1 to temp */
-        imulq    $4, %r11            /* Applying operation to temp with SRC2 */
-        movq     %r11, -108(%rbp)    /* Moving temp to dest */
-        nop                          /* add_q    vr22, vr21, vr20 */
-        movq     -108(%rbp), %r11    /* Moving SRC1 to temp */
-        addq     -100(%rbp), %r11    /* Applying operation to temp with SRC2 */
-        movq     %r11, -116(%rbp)    /* Moving temp to dest */
-        movl     $2, %r11d           /* mov_l    vr23, $2 */
-        movl     %r11d, -124(%rbp)   /* Moving temp to dst */
-        movq     -116(%rbp), %r9     /* mov_l    (vr22), vr23 */
-        movl     -124(%rbp), %r11d   /* Moving src to temp */
-        movl     %r11d, (%r9)        /* Moving temp to dst */
-        leaq     -12(%rbp), %r12     /* localaddr vr24, $0 */
-        movq     %r12, -132(%rbp)    /* Moving temp to dst */
-        movl     $2, %r11d           /* mov_l    vr25, $2 */
-        movl     %r11d, -140(%rbp)   /* Moving temp to dst */
-        movq     -132(%rbp), %r11    /* mov_q    vr26, vr24 */
-        movq     %r11, -148(%rbp)    /* Moving temp to dst */
-        nop                          /* mul_q    vr27, vr25, $4 */
-        movq     -140(%rbp), %r11    /* Moving SRC1 to temp */
-        imulq    $4, %r11            /* Applying operation to temp with SRC2 */
-        movq     %r11, -156(%rbp)    /* Moving temp to dest */
-        nop                          /* add_q    vr28, vr27, vr26 */
-        movq     -156(%rbp), %r11    /* Moving SRC1 to temp */
-        addq     -148(%rbp), %r11    /* Applying operation to temp with SRC2 */
-        movq     %r11, -164(%rbp)    /* Moving temp to dest */
-        movl     $3, %r11d           /* mov_l    vr29, $3 */
-        movl     %r11d, -172(%rbp)   /* Moving temp to dst */
-        movq     -164(%rbp), %r9     /* mov_l    (vr28), vr29 */
-        movl     -172(%rbp), %r11d   /* Moving src to temp */
-        movl     %r11d, (%r9)        /* Moving temp to dst */
-        leaq     -12(%rbp), %r12     /* localaddr vr30, $0 */
-        movq     %r12, -180(%rbp)    /* Moving temp to dst */
-        movl     $3, %r11d           /* mov_l    vr31, $3 */
-        movl     %r11d, -188(%rbp)   /* Moving temp to dst */
-        movl     -180(%rbp), %r11d   /* mov_l    vr1, vr30 */
-        movl     %r11d, %edi         /* Moving temp to dst */
-        movl     -188(%rbp), %r11d   /* mov_l    vr2, vr31 */
-        movl     %r11d, %esi         /* Moving temp to dst */
-        call     sum                 /* call     sum */
-        movl     %eax, %r11d         /* mov_l    vr32, vr0 */
-        movl     %r11d, -196(%rbp)   /* Moving temp to dst */
-        movl     -196(%rbp), %r11d   /* mov_l    vr11, vr32 */
-        movl     %r11d, -28(%rbp)    /* Moving temp to dst */
-        movl     -28(%rbp), %r11d    /* mov_l    vr0, vr11 */
-        movl     %r11d, %eax         /* Moving temp to dst */
-.Lmain_return:
-        popq     %r15                /* leave    $12 */
-        popq     %r14                /* Popping callee saved back to proper register */
-        popq     %r13                /* Popping callee saved back to proper register */
-        popq     %r12                /* Popping callee saved back to proper register */
-        popq     %rbx                /* Popping callee saved back to proper register */
-        popq     %rbp                /* Popping callee saved back to proper register */
-        addq     $544, %rsp
+        addq     $112, %rsp
         popq     %rbp
         ret                          /* ret       */

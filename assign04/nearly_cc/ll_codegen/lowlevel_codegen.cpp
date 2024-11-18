@@ -147,6 +147,7 @@ std::shared_ptr<InstructionSequence> LowLevelCodeGen::translate_hl_to_ll(std::sh
 
   m_total_memory_storage = funcdef_ast->get_total_local_storage();
 
+  m_data_base = m_total_memory_storage;
 
   if ((m_total_memory_storage) % 16 != 0)
     m_total_memory_storage += (16 - (m_total_memory_storage % 16));
@@ -343,7 +344,14 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
     no_inst->set_comment(comment);
     ll_iseq->append(no_inst);
 
-    Operand temp = Operand(select_mreg_kind(get_size(hl_opcode)),MachineReg::MREG_R11);
+        
+    Operand temp = Operand(select_mreg_kind(8),MachineReg::MREG_R11);
+    Instruction* clear_inst = new Instruction(select_ll_opcode(MINS_MOVB,8), Operand(Operand::IMM_IVAL,0), temp);
+    clear_inst->set_comment("Clear tmp register");
+    ll_iseq->append(clear_inst);
+
+    temp = Operand(select_mreg_kind(get_size(hl_opcode)),MachineReg::MREG_R11);
+    
     //MOVE SOURCE1 to TEMP
     LowLevelOpcode mov_t_opcode = select_ll_opcode(MINS_MOVB, get_size(hl_opcode));
     Instruction* mv_t_inst = new Instruction(mov_t_opcode, src1, temp);
@@ -403,7 +411,12 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
     no_inst->set_comment(comment);
     ll_iseq->append(no_inst);
 
-    Operand temp = Operand(select_mreg_kind(get_size(hl_opcode)),MachineReg::MREG_R11);
+    Operand temp = Operand(select_mreg_kind(8),MachineReg::MREG_R11);
+    Instruction* clear_inst = new Instruction(select_ll_opcode(MINS_MOVB,8), Operand(Operand::IMM_IVAL,0), temp);
+    clear_inst->set_comment("Clear tmp register");
+    ll_iseq->append(clear_inst);
+
+    temp = Operand(select_mreg_kind(get_size(hl_opcode)),MachineReg::MREG_R11);
 
     //MOVE SOURCE1 to TEMP
     LowLevelOpcode mov_t_opcode = select_ll_opcode(MINS_MOVB, get_size(hl_opcode));
@@ -474,10 +487,25 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
   std::set<HighLevelOpcode> MOV_OPS = {HINS_mov_b,HINS_mov_w,HINS_mov_l,HINS_mov_q};
 
   if (MOV_OPS.count(hl_opcode) > 0) {//found a move operation
-    Operand dest = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
+    Operand dest = get_ll_operand(hl_ins->get_operand(0), 8,ll_iseq);
     Operand src = get_ll_operand(hl_ins->get_operand(1), get_size(hl_opcode),ll_iseq);
 
-    Operand temp = Operand(select_mreg_kind(get_size(hl_opcode)),MachineReg::MREG_R11);
+    Instruction* clear_inst = new Instruction(select_ll_opcode(MINS_MOVB,8), Operand(Operand::IMM_IVAL,0), dest);
+    clear_inst->set_comment("Clear dest register");
+    ll_iseq->append(clear_inst);
+
+
+    dest = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
+
+
+
+    Operand temp = Operand(select_mreg_kind(8),MachineReg::MREG_R11);
+
+    clear_inst = new Instruction(select_ll_opcode(MINS_MOVB,8), Operand(Operand::IMM_IVAL,0), temp);
+    clear_inst->set_comment("Clear temp register");
+    ll_iseq->append(clear_inst);
+
+    temp = Operand(select_mreg_kind(get_size(hl_opcode)),MachineReg::MREG_R11);
 
     //MOVE SOURCE to temp
     LowLevelOpcode mov_a_opcode = select_ll_opcode(MINS_MOVB, get_size(hl_opcode));
@@ -512,7 +540,12 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
       Operand dst = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
       Operand label = hl_ins->get_operand(1);
 
-      Operand temp = Operand(select_mreg_kind(1),MachineReg::MREG_R11);
+      Operand temp = Operand(select_mreg_kind(8),MachineReg::MREG_R11);
+      Instruction* clear_inst = new Instruction(select_ll_opcode(MINS_MOVB,8), Operand(Operand::IMM_IVAL,0), temp);
+      clear_inst->set_comment("Clear tmp register");
+      ll_iseq->append(clear_inst);
+
+      temp = Operand(select_mreg_kind(1),MachineReg::MREG_R11);
 
       //MOVE Literal to TEMP
       LowLevelOpcode mov_t_opcode = select_ll_opcode(MINS_MOVB, 1);
@@ -531,7 +564,12 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
       Operand dst = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
       Operand label = hl_ins->get_operand(1);
 
-      Operand temp = Operand(select_mreg_kind(1),MachineReg::MREG_R11);
+      Operand temp = Operand(select_mreg_kind(8),MachineReg::MREG_R11);
+      Instruction* clear_inst = new Instruction(select_ll_opcode(MINS_MOVB,8), Operand(Operand::IMM_IVAL,0), temp);
+      clear_inst->set_comment("Clear tmp register");
+      ll_iseq->append(clear_inst);
+
+      temp = Operand(select_mreg_kind(1),MachineReg::MREG_R11);
 
       //MOVE Literal to TEMP
       LowLevelOpcode mov_t_opcode = select_ll_opcode(MINS_MOVB, 1);
@@ -554,7 +592,7 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
     Operand dst = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
     Operand immediate = get_ll_operand(hl_ins->get_operand(1), get_size(hl_opcode),ll_iseq);
     
-    int mem_offset = -1*(m_register_base - immediate.get_imm_ival()) -4;
+    int mem_offset = -1*(m_data_base - immediate.get_imm_ival());
     Operand mem_ref = Operand(Operand::MREG64_MEM_OFF,MachineReg::MREG_RBP,mem_offset);
 
     Operand temp = Operand(select_mreg_kind(8),MachineReg::MREG_R12);
@@ -593,13 +631,19 @@ Operand LowLevelCodeGen::get_ll_operand(Operand hl_opcode, int size, std::shared
       int mem_offset = -1*(m_register_base + 8*(reg_index+1));
       
       if (hl_opcode.get_kind() == Operand::VREG_MEM){
-        Operand temp = Operand(select_mreg_kind(8),MachineReg::MREG_R9);
+        Operand temp = Operand(select_mreg_kind(8),m_spare_regs[m_spare_reg]);
+        Instruction* clear_inst = new Instruction(select_ll_opcode(MINS_MOVB,8), Operand(Operand::IMM_IVAL,0), temp);
+        clear_inst->set_comment("Clear tmp register");
+        ll_iseq->append(clear_inst);
 
         Operand addr = Operand(Operand::MREG64_MEM_OFF,MachineReg::MREG_RBP,mem_offset);
         Instruction* mv_inst = new Instruction(select_ll_opcode(MINS_MOVB,8), addr, temp);
         mv_inst->set_comment("Move Address to tmp register");
         ll_iseq->append(mv_inst);
-        return Operand(Operand::MREG64_MEM,MachineReg::MREG_R9);
+        Operand ret_op = Operand(Operand::MREG64_MEM,m_spare_regs[m_spare_reg]);
+        m_spare_reg ++;
+        m_spare_reg %= 6;
+        return ret_op;
       }
       return Operand(Operand::MREG64_MEM_OFF,MachineReg::MREG_RBP,mem_offset);
     } else if (hl_opcode.get_base_reg()==0) { //passed return register
