@@ -26,6 +26,7 @@
 #include "symtab.h"
 #include "literal_value.h"
 #include "has_operand.h"
+#include "string_constant.h"
 
 //! The Node class will inherit from this type, so you can use it
 //! to define any attributes and methods that Node objects should have
@@ -48,6 +49,8 @@ private:
   Symbol* m_symbol;
   unsigned m_TLS;
   int m_ru;
+  StringConstant m_str_const;
+  bool m_has_str_const;
 
 public:
   NodeBase();
@@ -65,6 +68,10 @@ public:
   void set_total_local_storage(unsigned TLS) {m_TLS = TLS;}
   void set_reg_used(int ru) {m_ru = ru;}
   int get_reg_used() {return m_ru;}
+  StringConstant get_str_const() {return m_str_const;}
+  bool has_str_const() {return m_has_str_const;}
+  void add_str_const(StringConstant str_const) {m_str_const=str_const; m_has_str_const = true;}
+
 };
 
 #endif // NODE_BASE_H

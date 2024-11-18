@@ -446,7 +446,7 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
     
     Operand target = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
 
-    if (match_hl(hl_opcode,HINS_neg_b)){
+    if (match_hl(HINS_neg_b,hl_opcode)){
       //COMMENT
       Instruction* no_inst = new Instruction(HL_TO_LL.at(HINS_nop));
       std::stringstream comment;
@@ -454,10 +454,18 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
       no_inst->set_comment(comment.str());
       ll_iseq->append(no_inst);
 
+      Operand temp = Operand(select_mreg_kind(get_size(hl_opcode)),MachineReg::MREG_R8);
+
+      //MOVE Negation to TEMP
+      LowLevelOpcode mov_t_opcode = select_ll_opcode(MINS_MOVB, get_size(hl_opcode));
+      Instruction* mv_t_inst = new Instruction(mov_t_opcode, Operand(Operand::IMM_IVAL, -1), temp);
+      mv_t_inst->set_comment("Moving negation to temp");
+      ll_iseq->append(mv_t_inst);
+
       //OPERATION
       LowLevelOpcode arith_opcode = select_ll_opcode(HL_TO_LL.at(HINS_mul_b), get_size(hl_opcode));
       LiteralValue neg = LiteralValue(-1,false,false);
-      Instruction* neg_inst = new Instruction(arith_opcode,  Operand(Operand::IMM_IVAL, -1), target);
+      Instruction* neg_inst = new Instruction(arith_opcode, temp, target);
       neg_inst->set_comment("Negate target through multiplication by -1");
       ll_iseq->append(neg_inst);
 
@@ -470,9 +478,17 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
       no_inst->set_comment(comment.str());
       ll_iseq->append(no_inst);
 
+      Operand temp = Operand(select_mreg_kind(get_size(hl_opcode)),MachineReg::MREG_R8);
+
+      //MOVE Negation to TEMP
+      LowLevelOpcode mov_t_opcode = select_ll_opcode(MINS_MOVB, get_size(hl_opcode));
+      Instruction* mv_t_inst = new Instruction(mov_t_opcode, Operand(Operand::IMM_IVAL, 0), temp);
+      mv_t_inst->set_comment("Moving negation to temp");
+      ll_iseq->append(mv_t_inst);
+
       //OPERATION
       //Compare TARGET to 0
-      Instruction* mv_inst = new Instruction(MINS_CMPB, target, Operand(Operand::IMM_IVAL, 0));
+      Instruction* mv_inst = new Instruction(MINS_CMPB, target, temp);
       mv_inst->set_comment("Compare Target with 0");
       ll_iseq->append(mv_inst);
 
@@ -530,7 +546,7 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
 
 
     //Unconditional JMP to DST
-    if (match_hl(hl_opcode,HINS_jmp)){
+    if (match_hl(HINS_jmp,hl_opcode)){
       Operand label = hl_ins->get_operand(0);
 
       Instruction* mv_inst = new Instruction(MINS_JMP, label);
@@ -610,6 +626,46 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
 
     return;
   } 
+
+  std::set<HighLevelOpcode> SPL_OPS = {HINS_spill_b ,HINS_spill_w,HINS_spill_l,HINS_spill_q};
+
+  if (SPL_OPS.count(hl_opcode) > 0) {//found a spill operation
+    Operand dest = get_ll_operand(hl_ins->get_operand(0), 8,ll_iseq);
+    Operand src = get_ll_operand(hl_ins->get_operand(1), get_size(hl_opcode),ll_iseq);
+
+    Instruction* clear_inst = new Instruction(select_ll_opcode(MINS_MOVB,8), Operand(Operand::IMM_IVAL,0), dest);
+    clear_inst->set_comment("Clear dest register");
+    ll_iseq->append(clear_inst);
+
+
+    dest = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
+
+
+
+    Operand temp = Operand(select_mreg_kind(8),MachineReg::MREG_R11);
+
+    clear_inst = new Instruction(select_ll_opcode(MINS_MOVB,8), Operand(Operand::IMM_IVAL,0), temp);
+    clear_inst->set_comment("Clear temp register");
+    ll_iseq->append(clear_inst);
+
+    temp = Operand(select_mreg_kind(get_size(hl_opcode)),MachineReg::MREG_R11);
+
+    //MOVE SOURCE to temp
+    LowLevelOpcode mov_a_opcode = select_ll_opcode(MINS_MOVB, get_size(hl_opcode));
+    Instruction* mv_a_inst = new Instruction(mov_a_opcode, src, temp);
+    mv_a_inst->set_comment("Moving src to temp");
+    ll_iseq->append(mv_a_inst);
+
+    //MOVE temp to DEST
+    LowLevelOpcode mov_b_opcode = select_ll_opcode(MINS_MOVB, get_size(hl_opcode));
+    Instruction* mv_b_inst = new Instruction(mov_b_opcode, temp, dest);
+    mv_b_inst->set_comment("Moving temp to dst");
+    ll_iseq->append(mv_b_inst);
+
+
+
+    return;
+  }
 
   if (hl_opcode == HINS_call) {
     Operand label = hl_ins->get_operand(0);

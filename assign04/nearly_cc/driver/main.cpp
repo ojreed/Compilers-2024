@@ -145,6 +145,17 @@ void print_tokens(const std::string &filename) {
   }
 }
 
+void str_const_hunt(Unit* unit, Node* n) {
+  for (auto i = n->cbegin(); i != n->cend(); ++i) {
+    //setup
+    Node *child = *i;
+    str_const_hunt(unit,child);
+  }
+  if (n->has_str_const()) {
+    unit->add_str_constant(n->get_str_const());
+  }
+}
+
 void print_symbol_tables(SemanticAnalysis &sema) {
   // This *should* print consistent output independent of how
   // semantic analysis is implemented, as long as
@@ -245,7 +256,7 @@ void print_strconst_and_globals(Unit &unit) {
   for (auto i = unit.strconst_cbegin(); i != unit.strconst_cend(); ++i) {
     const StringConstant &strconst = *i;
     LiteralValue lv(strconst.get_content());
-    printf("%s: .string \"%s\"\n", strconst.get_label().c_str(), lv.get_str_value_escaped().c_str());
+    printf("%s: .string %s \n", strconst.get_label().c_str(), lv.get_str_value().c_str());
   }
 
   if (unit.has_global_variables())
@@ -417,6 +428,7 @@ int process_source_file(Options &options, const std::string &filename) {
   // TODO: find all of the string constants in the AST
   //       and add them to the Unit
 
+
   // Add global variables to the unit
   SymbolTable *global_symtab = unit.get_semantic_analysis().get_global_symtab();
   for (auto i = global_symtab->cbegin(); i != global_symtab->cend(); ++i) {
@@ -446,6 +458,8 @@ int process_source_file(Options &options, const std::string &filename) {
       unit.add_function(function);
     }
   }
+
+  str_const_hunt(&unit, unit.get_ast());
 
   // Print string constants and global variables
   // (these are the same regardless of code format)

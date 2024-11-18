@@ -28,6 +28,7 @@
 #include "exceptions.h"
 #include "local_storage_allocation.h"
 #include "highlevel_codegen.h"
+#include "string_constant.h"
 
 
 // Adjust an opcode for a basic type
@@ -403,7 +404,13 @@ void HighLevelCodegen::visit_function_call_expression(Node *n) {
     //get source register
     Operand s_reg = arg->get_operand();
 
-    Instruction* inst = new Instruction(opcode, f_reg, s_reg);
+    int i_v_temp = m_function->get_vra()->alloc_local();
+    Operand v_temp = Operand(Operand::VREG, i_v_temp);
+    Instruction* t_inst = new Instruction(opcode, v_temp, s_reg);
+    t_inst->set_comment("Safely Store Input Parameter: " + arg->get_str());
+    get_hl_iseq()->append(t_inst);
+
+    Instruction* inst = new Instruction(opcode, f_reg, v_temp);
     inst->set_comment("Input Parameter: " + arg->get_str());
     get_hl_iseq()->append(inst);
   }
@@ -562,7 +569,7 @@ void HighLevelCodegen::visit_literal_value(Node *n) {
   // A partial implementation (note that this won't work correctly
   // for string constants!):
   int vreg = m_function->get_vra()->alloc_local();
-  Operand dest(Operand::VREG, vreg);
+  Operand dest = Operand(Operand::VREG, vreg);
   HighLevelOpcode mov_opcode = get_opcode(HINS_mov_b, n->get_type());
   LiteralValue val;
   if (n->get_type()->get_basic_type_kind() == BasicTypeKind::INT) {
@@ -572,9 +579,14 @@ void HighLevelCodegen::visit_literal_value(Node *n) {
     get_hl_iseq()->append(inst);
   } else { //TODO: fix char
     std::string lit_str = n->get_kid(0)->get_str();
-    Instruction* inst = new Instruction(mov_opcode, dest, Operand(Operand::IMM_IVAL, lit_str));
+    std::string lit_label = "_str" + std::to_string(get_next_label_num());
+    StringConstant str_friend = StringConstant(lit_label,lit_str);
+    n->add_str_const(str_friend);
+    mov_opcode = get_opcode(HINS_mov_b, std::make_shared<BasicType>(BasicTypeKind::LONG, true));
+    Instruction* inst = new Instruction(mov_opcode, dest, Operand(Operand::IMM_LABEL, lit_label));
     inst->set_comment("Initialize literal char");
     get_hl_iseq()->append(inst);
+    n->reset_type(std::make_shared<BasicType>(BasicTypeKind::LONG, true));
   }
   n->set_operand(dest);
 }
