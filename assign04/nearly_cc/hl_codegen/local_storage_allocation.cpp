@@ -58,12 +58,14 @@ void LocalStorageAllocation::visit_function_definition(Node *n) {
       s->set_al(m_storage_calc.add_field(s->get_type())); 
     } else { //can be stored in register
       s->set_reg(m_function->get_vra()->alloc_local());
+      allocated+=1;
     }
-    allocated+=1;
-    m_storage_calc.finish();
-    n->set_total_local_storage(m_storage_calc.get_size());
+    
     // printf("Register: %d, Offset: %d\n",s->get_reg(),s->get_al());
   }
+  m_storage_calc.finish();
+  n->set_total_local_storage(m_storage_calc.get_size());
+  n->set_reg_used(allocated);
 }
 
 void LocalStorageAllocation::visit_statement_list(Node *n) {
@@ -80,6 +82,8 @@ void LocalStorageAllocation::visit_statement_list(Node *n) {
       s->set_reg(m_function->get_vra()->alloc_local());
     }
     allocated+=1;
+    m_storage_calc.finish();
+    n->set_total_local_storage(m_storage_calc.get_size());
     // printf("Register: %d, Offset: %d\n",s->get_reg(),s->get_al());
   }
 }

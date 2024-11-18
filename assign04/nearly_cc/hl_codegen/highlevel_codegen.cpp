@@ -77,6 +77,8 @@ void HighLevelCodegen::visit_function_definition(Node *n) {
 
   Node* parameter_list = n->get_kid(2);
 
+
+  // m_function->get_vra()->enter_block();
   for (auto i = parameter_list->cbegin(); i != parameter_list->cend(); ++i) {
     //setup
     Node *param = *i;
@@ -98,8 +100,12 @@ void HighLevelCodegen::visit_function_definition(Node *n) {
     param->get_symbol()->set_reg(i_local); //change symbol table to encode new local register for input value
   }
 
+  auto [mark, reg] = m_function->get_vra()->enter_block();
+
   // visit body
   visit(n->get_kid(3));
+
+  m_function->get_vra()->leave_block(mark,reg);
 
   get_hl_iseq()->define_label(m_return_label_name);
   get_hl_iseq()->append(new Instruction(HINS_leave, Operand(Operand::IMM_IVAL, total_local_storage)));
@@ -108,11 +114,13 @@ void HighLevelCodegen::visit_function_definition(Node *n) {
 
 void HighLevelCodegen::visit_statement_list(Node *n) {
   //TODO: SCOPE????
+  // int mark = m_function->get_vra()->enter_block();
   for (auto i = n->cbegin(); i != n->cend(); ++i) {
     //setup
     Node *stmt = *i;
     visit(stmt);
   }
+  // m_function->get_vra()->leave_block(mark);
 }
 
 void HighLevelCodegen::visit_expression_statement(Node *n) {
@@ -496,6 +504,11 @@ void HighLevelCodegen::visit_array_element_ref_expression(Node *n) {
   Operand addr = Operand(Operand::VREG, i_addr);
   Instruction* inst = new Instruction(HINS_mov_q, addr, arr_reg);
   inst->set_comment("Store Array Address");
+  get_hl_iseq()->append(inst);
+
+  //fix index:
+  inst = new Instruction(HINS_add_q, index_reg, index_reg, Operand(Operand::IMM_IVAL, 1));
+  inst->set_comment("Compute final address from Array_Base+Computed_Offset");
   get_hl_iseq()->append(inst);
 
   //Compute offset = index*size

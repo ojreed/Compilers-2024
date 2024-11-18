@@ -146,26 +146,37 @@ std::shared_ptr<InstructionSequence> LowLevelCodeGen::translate_hl_to_ll(std::sh
   // spilled machine registers, etc.
 
   m_total_memory_storage = funcdef_ast->get_total_local_storage();
+
+
+  if ((m_total_memory_storage) % 16 != 0)
+    m_total_memory_storage += (16 - (m_total_memory_storage % 16));
+
   m_register_base = m_total_memory_storage;
-  Symbol *fn_id = funcdef_ast->get_kid(1)->get_symbol();
-  SymbolTable *l_symtab = fn_id->get_symtab_k();
-  for (auto i = l_symtab->cbegin(); i != l_symtab->cend(); ++i) { //for all local vars
-    Symbol *s = *i;
-    if (s->get_type()->is_array() || s->get_type()->is_struct()){//needs mem_alloc
 
-      /*do nothing already allocated*/
+  
+  // Symbol *fn_id = funcdef_ast->get_kid(1)->get_symbol();
+  // SymbolTable *l_symtab = fn_id->get_symtab_k();
+  // ;
+  // for (auto i = l_symtab->cbegin(); i != l_symtab->cend(); ++i) { //for all local vars
+  //   Symbol *s = *i;
+  //   if (s->get_type()->is_array() || s->get_type()->is_struct()){//needs mem_alloc
 
-    } else { //can be stored in register
-      m_total_memory_storage += 8;
-    }
-  }
+  //     /*do nothing already allocated*/
+
+  //   } else { //can be stored in register
+  //     ;
+  //   }
+  // }
+  m_total_memory_storage += 8*(m_function->get_vra()->get_size());
+
+  if ((m_total_memory_storage) % 16 != 0)
+    m_total_memory_storage += (16 - (m_total_memory_storage % 16));
 
   // The function prologue will push %rbp, which should guarantee that the
   // stack pointer (%rsp) will contain an address that is a multiple of 16.
   // If the total memory storage required is not a multiple of 16, add to
   // it so that it is.
-  if ((m_total_memory_storage) % 16 != 0)
-    m_total_memory_storage += (16 - (m_total_memory_storage % 16));
+
 
   // Iterate through high level instructions
   for (auto i = hl_iseq->cbegin(); i != hl_iseq->cend(); ++i) {
@@ -393,6 +404,7 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
     ll_iseq->append(no_inst);
 
     Operand temp = Operand(select_mreg_kind(get_size(hl_opcode)),MachineReg::MREG_R11);
+
     //MOVE SOURCE1 to TEMP
     LowLevelOpcode mov_t_opcode = select_ll_opcode(MINS_MOVB, get_size(hl_opcode));
     Instruction* mv_t_inst = new Instruction(mov_t_opcode, src1, temp);
@@ -501,6 +513,7 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
       Operand label = hl_ins->get_operand(1);
 
       Operand temp = Operand(select_mreg_kind(1),MachineReg::MREG_R11);
+
       //MOVE Literal to TEMP
       LowLevelOpcode mov_t_opcode = select_ll_opcode(MINS_MOVB, 1);
       Instruction* mv_t_inst = new Instruction(mov_t_opcode, Operand(Operand::IMM_IVAL, 0), temp);
@@ -519,6 +532,7 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
       Operand label = hl_ins->get_operand(1);
 
       Operand temp = Operand(select_mreg_kind(1),MachineReg::MREG_R11);
+
       //MOVE Literal to TEMP
       LowLevelOpcode mov_t_opcode = select_ll_opcode(MINS_MOVB, 1);
       Instruction* mv_t_inst = new Instruction(mov_t_opcode, Operand(Operand::IMM_IVAL, 0), temp);
@@ -539,9 +553,22 @@ void LowLevelCodeGen::translate_instruction(Instruction *hl_ins, std::shared_ptr
   if (hl_opcode == HINS_localaddr) {
     Operand dst = get_ll_operand(hl_ins->get_operand(0), get_size(hl_opcode),ll_iseq);
     Operand immediate = get_ll_operand(hl_ins->get_operand(1), get_size(hl_opcode),ll_iseq);
-    Instruction* mv_inst = new Instruction(MINS_LEAQ, immediate,dst);
-    mv_inst->set_comment("Calling Function");
+    
+    int mem_offset = -1*(m_register_base - immediate.get_imm_ival()) -4;
+    Operand mem_ref = Operand(Operand::MREG64_MEM_OFF,MachineReg::MREG_RBP,mem_offset);
+
+    Operand temp = Operand(select_mreg_kind(8),MachineReg::MREG_R12);
+
+    //DO LEA
+    Instruction* mv_inst = new Instruction(MINS_LEAQ, mem_ref, temp);
+    mv_inst->set_comment("Load Address");
     ll_iseq->append(mv_inst);
+
+    //MOVE temp to DST
+    LowLevelOpcode mov_b_opcode = select_ll_opcode(MINS_MOVB, 8);
+    Instruction* mv_b_inst = new Instruction(mov_b_opcode, temp, dst);
+    mv_b_inst->set_comment("Moving temp to dst");
+    ll_iseq->append(mv_b_inst);
 
     return;
   } 
@@ -563,14 +590,16 @@ Operand LowLevelCodeGen::get_ll_operand(Operand hl_opcode, int size, std::shared
   if (hl_opcode.has_base_reg()){//assert we are passed a VR 
     if (hl_opcode.get_base_reg()>=10) {//standard VR
       int reg_index = hl_opcode.get_base_reg()-10;
-      int mem_offset = -1*(m_register_base + 8*(reg_index));
+      int mem_offset = -1*(m_register_base + 8*(reg_index+1));
+      
       if (hl_opcode.get_kind() == Operand::VREG_MEM){
-        Operand temp = Operand(select_mreg_kind(size),MachineReg::MREG_R9);
+        Operand temp = Operand(select_mreg_kind(8),MachineReg::MREG_R9);
+
         Operand addr = Operand(Operand::MREG64_MEM_OFF,MachineReg::MREG_RBP,mem_offset);
-        Instruction* mv_inst = new Instruction(select_ll_opcode(MINS_MOVB,size), addr, temp);
+        Instruction* mv_inst = new Instruction(select_ll_opcode(MINS_MOVB,8), addr, temp);
         mv_inst->set_comment("Move Address to tmp register");
         ll_iseq->append(mv_inst);
-        return Operand(Operand::MREG64_MEM,MachineReg::MREG_R9);;  
+        return Operand(Operand::MREG64_MEM,MachineReg::MREG_R9);
       }
       return Operand(Operand::MREG64_MEM_OFF,MachineReg::MREG_RBP,mem_offset);
     } else if (hl_opcode.get_base_reg()==0) { //passed return register
@@ -580,7 +609,7 @@ Operand LowLevelCodeGen::get_ll_operand(Operand hl_opcode, int size, std::shared
       int reg_index = hl_opcode.get_base_reg() -1;
       return Operand(select_mreg_kind(size),args[reg_index]);
     }
-  } else { //passed a literal
+  } else { //passed a literal memref
     return hl_opcode;
   }
 }

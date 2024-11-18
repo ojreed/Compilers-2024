@@ -1,5 +1,6 @@
 #ifndef VREG_ALLOCATOR_H
 #define VREG_ALLOCATOR_H
+#include <tuple>
 
 // A VRegAllocator helps the high-level code generator manage
 // virtual registers, including
@@ -14,6 +15,7 @@ private:
   int m_first_temp;      // first vreg in current block that is a temporary
   bool m_params_ended;   // true if all parameters have been allocated
   bool m_temps_active;   // true if temporaries have been allocated in the current block
+  int m_reg_count;
 
   // don't allow copy ctor and assignment operator
   VregAllocator(const VregAllocator &);
@@ -29,17 +31,19 @@ public:
   // Add a parameter
   int alloc_param();
 
+  int get_size() {return m_reg_count;}
+
   // Call when all parameters have been added
   void end_params();
 
   // Enter block scope.
   // Returns the current "high water mark" representing where allocation
   // should resume upon leaving the block scope.
-  int enter_block();
+  std::tuple<int, int> enter_block();
 
   // Leave a block. Parameter is the value returned by the previous
   // call to enter_block()
-  void leave_block(int mark);
+  void leave_block(int mark, int reg);
 
   // Allocate a local variable in current block.
   // The vreg will not be used as a temporary in subsequent statements,
