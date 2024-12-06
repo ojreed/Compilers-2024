@@ -92,9 +92,9 @@ class LVN : public ControlFlowGraphTransform {
     std::map<int, int> constant_to_value_number;                   // Map constant values to value numbers
     std::map<int, int> value_number_to_constant;                   // Map value numbers to constants
     std::map<int, int> vreg_to_value_number;                       // Map vregs to value numbers
-    std::map<int, std::vector<int>> value_number_to_vregs;  // Map value numbers to vregs
+    std::map<int, std::vector<int>> value_number_to_vregs;         // Map value numbers to vregs
     std::map<LVNKey, int> lvnkey_to_value_number;                  // Map LVNKey to value number
-    int next_value_number = 1;                                               // Next value number to assign
+    int next_value_number = 1;                                     // Next value number to assign
   public:
 
     LVN(std::shared_ptr<ControlFlowGraph> cfg): ControlFlowGraphTransform(cfg), m_live_vregs(cfg) {
@@ -104,17 +104,23 @@ class LVN : public ControlFlowGraphTransform {
 
     virtual std::shared_ptr<InstructionSequence> transform_basic_block(std::shared_ptr<InstructionSequence> orig_bb) {
       //Preform Local Value Numbering
+
+      //clear data for local BB
       std::map<int, int> constant_to_value_number;                   // Map constant values to value numbers
       std::map<int, int> value_number_to_constant;                   // Map value numbers to constants
       std::map<int, int> vreg_to_value_number;                       // Map vregs to value numbers
-      std::map<int, std::vector<int>> value_number_to_vregs;  // Map value numbers to vregs
+      std::map<int, std::vector<int>> value_number_to_vregs;         // Map value numbers to vregs
       std::map<LVNKey, int> lvnkey_to_value_number;                  // Map LVNKey to value number
-      int next_value_number = 1;                                               // Next value number to assign
-      // printf("NEW BB\n");
-      // printf("SIZE OF VREG TO VN: %d \n",vreg_to_value_number.size());
+      int next_value_number = 1;                                     // Next value number to assign
+
+      //Create clean BB to return
       std::shared_ptr<InstructionSequence> new_bb(new InstructionSequence());
+
+      //Iterate over instructions in BB
       for (auto it = orig_bb->cbegin(); it != orig_bb->cend(); ++it) {
         const auto& inst = *it;
+
+        //Skip
         if (inst->get_num_operands() <= 0 || inst->get_operand(0).is_label() || (inst->get_num_operands() > 2 && inst->get_operand(1).is_label()) || inst->get_operand(0).is_imm_ival()) {
           new_bb->append(inst->duplicate());
           continue;
@@ -127,6 +133,8 @@ class LVN : public ControlFlowGraphTransform {
         // Track value numbers for operands
         std::vector<int> operand_value_numbers;
         bool constant_value = true;
+
+        //Label Source Operands
         for (int i = 1; i < num_ops; ++i) {
             auto operand = inst->get_operand(i);
             int operand_value_number;
@@ -146,7 +154,6 @@ class LVN : public ControlFlowGraphTransform {
                 operand_value_number = constant_to_value_number[i_val];
             } else if (!operand.is_imm_label() && operand.get_kind() != Operand::LABEL){
                 // Assign or retrieve value number for virtual register
-                // printf("OPERAND KIND %d \n",operand.get_kind());
                 auto vreg = operand.get_base_reg();
                 if (vreg_to_value_number.count(vreg) == 0) {
                     vreg_to_value_number[vreg] = next_value_number;
@@ -155,14 +162,11 @@ class LVN : public ControlFlowGraphTransform {
                 }
                 operand_value_number = vreg_to_value_number[vreg];
             } 
-            // printf("%d\n",operand_value_number);
-
             operand_value_numbers.push_back(operand_value_number);
             operand.set_val_num(operand_value_number);
         }
 
         // Create an LVNKey
-         
         LVNKey key(opcode, operand_value_numbers, constant_value);
 
         // Determine if the value is a compile-time constant
@@ -178,11 +182,10 @@ class LVN : public ControlFlowGraphTransform {
           }
         }
         result_value_number = lvnkey_to_value_number[key];
-        // printf("OPERAND KIND %d \n",operand.get_kind());
+
         auto vreg = operand.get_base_reg();
         vreg_to_value_number[vreg] = result_value_number;
         value_number_to_vregs[result_value_number].push_back(vreg);
-        // printf("%d\n",result_value_number);
         operand.set_val_num(result_value_number);
 
         //DO COPY PROPOGATION
@@ -190,15 +193,12 @@ class LVN : public ControlFlowGraphTransform {
         for (int i = 1; i < num_ops; ++i) {
           auto operand = new_inst->get_operand(i);
           if (!operand.is_imm_ival() && !operand.is_label()) {
-            // printf("OPERAND KIND %d \n",operand.get_kind());
             int original_reg = operand.get_base_reg();
             int target_value = vreg_to_value_number[original_reg];
             int target_reg = value_number_to_vregs[target_value][0];
             new_inst->set_operand(i,Operand(operand.get_kind(),target_reg));
-            // printf("%d %d \n",original_reg,target_reg);
           }
         }
-
 
         // Append the instruction to the new basic block
         new_bb->append(new_inst);
@@ -300,6 +300,7 @@ void HighLevelOpt::optimize(std::shared_ptr<Function> function) {
   LVN lvn(hl_cfg);
   hl_cfg = lvn.transform_cfg();
 
+  //Dead Store Elimination
   DSE dse(hl_cfg);
   hl_cfg = dse.transform_cfg();
 
